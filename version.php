@@ -1,13 +1,16 @@
- * SRL Study local plugin version information.
+<?php
+/**
+ * SRL Advisor local plugin version information.
  *
  * @package    local_srl_advisor
- * @copyright  2026 SRL Advisor
+ * @copyright  2026 Andrew Schwabe
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026031000; // The current plugin version (Date: YYYYMMDDXX).
-$plugin->requires  = 2022112800; // Requires this Moodle version (Moodle 4.1).
-$plugin->component = 'local_srl_advisor'; // Full name of the plugin (used for diagnostics).
+$plugin->version   = 2026031001;   // The current plugin version (Date: YYYYMMDDXX).
+$plugin->requires  = 2022112800;   // Requires Moodle 4.1+.
+$plugin->component = 'local_srl_advisor';
 $plugin->maturity  = MATURITY_ALPHA;
-$plugin->release   = 'v0.1.0-alpha';
+$plugin->release   = 'v0.2.0-alpha';
