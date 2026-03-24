@@ -14,15 +14,77 @@
 defined('MOODLE_INTERNAL') || die();
 
 /**
+ * Builds a signed JWT for server-to-server calls to the SRL Advisor API.
+ * Uses the same signing scheme as launch.php so the backend can verify it.
+ *
+ * @param int    $courseid       Moodle course ID.
+ * @param string $pseudonymous_id SHA-256 hash of user ID + site identifier.
+ * @param string $api_token      Org API token used as the HMAC signing secret.
+ * @return string Signed JWT string.
+ */
+function local_srl_advisor_build_jwt($courseid, $pseudonymous_id, $api_token) {
+    global $CFG;
+
+    $issued_at  = time();
+    $expires_at = $issued_at + 60; // Short TTL — API call only, not a browser launch.
+
+    $header  = rtrim(strtr(base64_encode(json_encode(['alg' => 'HS256', 'typ' => 'JWT'])), '+/', '-_'), '=');
+    $payload = rtrim(strtr(base64_encode(json_encode([
+        'iss'        => parse_url($CFG->wwwroot, PHP_URL_HOST),
+        'sub'        => $pseudonymous_id,
+        'course_id'  => $courseid,
+        'section_id' => null,
+        'iat'        => $issued_at,
+        'exp'        => $expires_at,
+    ])), '+/', '-_'), '=');
+
+    $signature = rtrim(strtr(base64_encode(hash_hmac('sha256', "$header.$payload", $api_token, true)), '+/', '-_'), '=');
+
+    return "$header.$payload.$signature";
+}
+
+/**
+ * Calls the SRL Advisor action-items API and returns the pending count.
+ * Returns 0 silently on any error so a slow or unreachable backend never
+ * breaks Moodle navigation.
+ *
+ * @param string $backend_url   Base URL of the SRL Advisor backend.
+ * @param string $jwt           Signed JWT for Bearer authentication.
+ * @return int  Number of pending action items (0 on error).
+ */
+function local_srl_advisor_get_pending_count($backend_url, $jwt) {
+    $url = rtrim($backend_url, '/') . '/api/v1/action-items';
+
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 3, // Never block navigation for more than 3 seconds.
+        CURLOPT_HTTPHEADER     => ["Authorization: Bearer $jwt"],
+    ]);
+
+    $response = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($response === false || $http_code !== 200) {
+        return 0;
+    }
+
+    $data = json_decode($response, true);
+    return isset($data['pending_count']) ? (int)$data['pending_count'] : 0;
+}
+
+/**
  * Injects an "SRL Advisor" link into the course navigation if the current
  * course is in the admin-managed list of enabled courses.
+ * Appends a numeric badge to the label when the student has pending action items.
  *
  * @param navigation_node $navigation The course navigation node.
  * @param stdClass $course The current course object.
  * @param context_course $context The course context.
  */
 function local_srl_advisor_extend_navigation_course($navigation, $course, $context) {
-    global $USER;
+    global $USER, $CFG;
 
     // Only show the link to enrolled students (not guests, admins viewing as themselves).
     if (!isloggedin() || isguestuser()) {
@@ -47,12 +109,25 @@ function local_srl_advisor_extend_navigation_course($navigation, $course, $conte
         return;
     }
 
+    // Derive the pseudonymous user ID (matches what launch.php sends).
+    $pseudonymous_id = hash('sha256', $USER->id . $CFG->siteidentifier);
+
+    // Query the SRL Advisor API for pending action items.
+    $jwt           = local_srl_advisor_build_jwt($course->id, $pseudonymous_id, $api_token);
+    $pending_count = local_srl_advisor_get_pending_count($backend_url, $jwt);
+
+    // Build the nav label — append badge count when there are pending items.
+    $label = get_string('nav_link', 'local_srl_advisor');
+    if ($pending_count > 0) {
+        $label .= ' (' . $pending_count . ')';
+    }
+
     // Build the URL for the launch page, passing the current course ID.
     $launch_url = new moodle_url('/local/srl_advisor/launch.php', ['courseid' => $course->id]);
 
     // Add the link to the course navigation under the course root node.
     $node = navigation_node::create(
-        get_string('nav_link', 'local_srl_advisor'),
+        $label,
         $launch_url,
         navigation_node::TYPE_CUSTOM,
         null,
