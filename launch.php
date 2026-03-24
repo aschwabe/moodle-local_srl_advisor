@@ -21,8 +21,9 @@ require_once(__DIR__ . '/../../config.php');
 require_login();
 
 // Get the course ID from the request.
-$courseid = required_param('courseid', PARAM_INT);
-$course   = get_course($courseid);
+$courseid  = required_param('courseid', PARAM_INT);
+$sectionid = optional_param('sectionid', null, PARAM_INT); // Optional: triggers micro-survey if present.
+$course    = get_course($courseid);
 
 // Set up the Moodle page context.
 $context = context_course::instance($courseid);
@@ -48,11 +49,12 @@ $expires_at = $issued_at + 300; // Token valid for 5 minutes (enough to bridge t
 $header = base64_encode(json_encode(['alg' => 'HS256', 'typ' => 'JWT']));
 
 $payload = base64_encode(json_encode([
-    'iss'       => parse_url($CFG->wwwroot, PHP_URL_HOST), // Moodle instance domain.
-    'sub'       => $pseudonymous_id,                       // Pseudonymous participant ID.
-    'course_id' => $courseid,                              // The Moodle Course ID.
-    'iat'       => $issued_at,
-    'exp'       => $expires_at,
+    'iss'        => parse_url($CFG->wwwroot, PHP_URL_HOST), // Moodle instance domain.
+    'sub'        => $pseudonymous_id,                       // Pseudonymous participant ID.
+    'course_id'  => $courseid,                              // The Moodle Course ID.
+    'section_id' => $sectionid,                             // Optional: Moodle section for micro-surveys.
+    'iat'        => $issued_at,
+    'exp'        => $expires_at,
 ]));
 
 // Sign the JWT using HMAC-SHA256 with the org API token as the secret.
