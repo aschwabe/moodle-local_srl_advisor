@@ -38,5 +38,14 @@ if ($hassiteconfig) {
         PARAM_TEXT
     ));
 
+    // Insecure SSL: Disable peer/host verification for the backend call.
+    // Intended for dev/self-signed backends. Leave off in production.
+    $settings->add(new admin_setting_configcheckbox(
+        'local_srl_advisor/insecure_ssl',
+        get_string('settings_insecure_ssl', 'local_srl_advisor'),
+        get_string('settings_insecure_ssl_desc', 'local_srl_advisor'),
+        0
+    ));
+
     $ADMIN->add('localplugins', $settings);
 }

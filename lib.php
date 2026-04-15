@@ -55,18 +55,28 @@ function local_srl_advisor_build_jwt($courseid, $pseudonymous_id, $api_token) {
 function local_srl_advisor_get_pending_count($backend_url, $jwt) {
     $url = rtrim($backend_url, '/') . '/api/v1/action-items';
 
+    // Allow insecure SSL for dev/self-signed backends via plugin config.
+    $insecure_ssl = (bool)get_config('local_srl_advisor', 'insecure_ssl');
+
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT        => 3, // Never block navigation for more than 3 seconds.
         CURLOPT_HTTPHEADER     => ["Authorization: Bearer $jwt"],
+        CURLOPT_SSL_VERIFYPEER => $insecure_ssl ? false : true,
+        CURLOPT_SSL_VERIFYHOST => $insecure_ssl ? 0 : 2,
     ]);
 
-    $response = curl_exec($ch);
+    $response  = curl_exec($ch);
+    $curl_err  = curl_error($ch);
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
     if ($response === false || $http_code !== 200) {
+        debugging(
+            "local_srl_advisor: action-items call failed (url=$url, http=$http_code, err=$curl_err, body=" . substr((string)$response, 0, 200) . ")",
+            DEBUG_DEVELOPER
+        );
         return 0;
     }
 
