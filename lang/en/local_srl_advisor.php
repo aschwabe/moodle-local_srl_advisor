@@ -22,3 +22,9 @@ $string['settings_api_token']              = 'Organization API Token';
 $string['settings_api_token_desc']         = 'The unique API token generated from the SRL Advisor Superadmin portal for this institution. This is used to sign the JWTs.';
 $string['settings_enabled_course_ids']     = 'Enabled Course IDs';
 $string['settings_enabled_course_ids_desc'] = 'A comma-separated list of Moodle Course IDs where the SRL Advisor link will be displayed (e.g., 2,3,7). All other courses will not show the link.';
+
+// Privacy API (null_provider — DEC-017).
+$string['privacy:metadata'] = 'The SRL Advisor plugin does not store any personal data in Moodle. It computes ephemeral SHA-256 hashes of user IDs (using the site identifier as a salt) and forwards them to the SRL Advisor backend for the launch flow and for consent-gated data sync. Real Moodle user IDs are sent to the backend only as transient API parameters and are never persisted there.';
+
+// Web service (DEC-017).
+$string['srladvisor_sync_service'] = 'SRL Advisor Sync';

@@ -9,7 +9,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026031001;   // The current plugin version (Date: YYYYMMDDXX).
+$plugin->version   = 2026041501;   // The current plugin version (Date: YYYYMMDDXX). DEC-017: webservice + privacy provider.
 $plugin->requires  = 2022112800;   // Requires Moodle 4.1+.
 $plugin->component = 'local_srl_advisor';
 $plugin->maturity  = MATURITY_ALPHA;
