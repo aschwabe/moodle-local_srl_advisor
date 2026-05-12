@@ -31,7 +31,11 @@ $functions = [
 
 $services = [
     'SRL Advisor Sync' => [
-        'functions'        => ['local_srl_advisor_get_enrolled_hashed_users'],
+        'functions'        => [
+            'local_srl_advisor_get_enrolled_hashed_users',
+            'gradereport_user_get_grade_items',
+            'core_completion_get_activities_completion_status',
+        ],
         'restrictedusers'  => 1,
         'enabled'          => 1,
         'shortname'        => 'local_srl_advisor_sync',

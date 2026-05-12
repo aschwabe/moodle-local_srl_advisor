@@ -9,7 +9,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026041502;   // The current plugin version (Date: YYYYMMDDXX). Badge: log curl errors, add insecure_ssl dev toggle.
+$plugin->version   = 2026051200;   // The current plugin version (Date: YYYYMMDDXX). DEC-026: add core grade + completion fns to local_srl_advisor_sync service.
 $plugin->requires  = 2022112800;   // Requires Moodle 4.1+.
 $plugin->component = 'local_srl_advisor';
 $plugin->maturity  = MATURITY_ALPHA;
