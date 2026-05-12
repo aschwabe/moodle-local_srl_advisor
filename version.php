@@ -9,7 +9,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026051200;   // The current plugin version (Date: YYYYMMDDXX). DEC-026: add core grade + completion fns to local_srl_advisor_sync service.
+$plugin->version   = 2026051201;   // LAB-001: entry + per-return debugging() in extend_navigation_course to surface why badge not visible.
 $plugin->requires  = 2022112800;   // Requires Moodle 4.1+.
 $plugin->component = 'local_srl_advisor';
 $plugin->maturity  = MATURITY_ALPHA;

@@ -96,8 +96,12 @@ function local_srl_advisor_get_pending_count($backend_url, $jwt) {
 function local_srl_advisor_extend_navigation_course($navigation, $course, $context) {
     global $USER, $CFG;
 
+    // LAB-001 diagnostic — confirm hook fires at all on this page.
+    debugging("local_srl_advisor: extend_navigation_course ENTER courseid={$course->id} userid={$USER->id}", DEBUG_DEVELOPER);
+
     // Only show the link to enrolled students (not guests, admins viewing as themselves).
     if (!isloggedin() || isguestuser()) {
+        debugging("local_srl_advisor: SKIP — not logged in or guest user", DEBUG_DEVELOPER);
         return;
     }
 
@@ -105,19 +109,24 @@ function local_srl_advisor_extend_navigation_course($navigation, $course, $conte
     $backend_url = trim(get_config('local_srl_advisor', 'backend_url'));
     $api_token   = trim(get_config('local_srl_advisor', 'api_token'));
     if (empty($backend_url) || empty($api_token)) {
+        debugging("local_srl_advisor: SKIP — backend_url or api_token empty (backend_url_set=" . (!empty($backend_url) ? '1' : '0') . " api_token_set=" . (!empty($api_token) ? '1' : '0') . ")", DEBUG_DEVELOPER);
         return;
     }
 
     // Check if the current course is in the admin-defined allowlist.
     $enabled_ids_raw = get_config('local_srl_advisor', 'enabled_course_ids');
     if (empty($enabled_ids_raw)) {
+        debugging("local_srl_advisor: SKIP — enabled_course_ids config is empty", DEBUG_DEVELOPER);
         return;
     }
 
     $enabled_ids = array_map('trim', explode(',', $enabled_ids_raw));
     if (!in_array((string)$course->id, $enabled_ids)) {
+        debugging("local_srl_advisor: SKIP — courseid {$course->id} not in enabled_course_ids=[{$enabled_ids_raw}]", DEBUG_DEVELOPER);
         return;
     }
+
+    debugging("local_srl_advisor: PASS gates — calling action-items API (backend_url={$backend_url})", DEBUG_DEVELOPER);
 
     // Derive the pseudonymous user ID (matches what launch.php sends).
     $pseudonymous_id = hash('sha256', $USER->id . $CFG->siteidentifier);
@@ -125,6 +134,7 @@ function local_srl_advisor_extend_navigation_course($navigation, $course, $conte
     // Query the SRL Advisor API for pending action items.
     $jwt           = local_srl_advisor_build_jwt($course->id, $pseudonymous_id, $api_token);
     $pending_count = local_srl_advisor_get_pending_count($backend_url, $jwt);
+    debugging("local_srl_advisor: pending_count={$pending_count} — rendering nav node", DEBUG_DEVELOPER);
 
     // Build the nav label — append badge count when there are pending items.
     $label = get_string('nav_link', 'local_srl_advisor');
