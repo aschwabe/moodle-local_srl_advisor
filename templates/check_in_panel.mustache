@@ -3,33 +3,24 @@
 
     Inline unit check-in panel (DEC-031 v1.1).
 
-    Mustache auto-escapes by default — closes the XSS surface that an
-    innerHTML approach would have left open on `label` and `name`/`description`.
-    AMD module renders this server-side template via `core/templates`.
+    Mustache auto-escapes by default - closes the XSS surface that an
+    innerHTML approach would have left open on label and name/description.
+    AMD module renders this server-side template via core/templates.
 
     Context vars:
-        task_id            int
-        is_pre             bool
-        heading            string (already localised via core/str)
-        no_strategy_label  string (already localised)
-        submit_label       string
-        dismiss_label      string
-        portal_fallback_label string
-        portal_url         string  (launch-page URL for the legacy portal flow)
-        aria_label         string
-        idempotency_key    string  (UUID v4 generated client-side)
-        options            array of:
-            kind           'strategy' | 'no_strategy'
-            strategy_id    int (0 for no_strategy)
-            name           string (for kind=strategy)
-            description    string (for kind=strategy)
-            label          string (for kind=no_strategy)
+        task_id                int
+        is_pre                 bool
+        heading                string (already localised via core/str)
+        submit_label           string
+        dismiss_label          string
+        portal_fallback_label  string
+        portal_url             string  (launch-page URL for the legacy portal flow)
+        aria_label             string
+        idempotency_key        string  (UUID v4 generated client-side)
+        options                array of {kind, strategy_id, name, description, label}
 
-    @example
-        {{< local_srl_advisor/check_in_panel }}
-        {{$ task_id }} 42 {{/ task_id }}
-        {{$ heading }} Before you start... {{/ heading }}
-        {{/ local_srl_advisor/check_in_panel }}
+    NB: an @example block containing nested Mustache section tags would itself
+    be parsed and break Mustache_Parser. The example is intentionally omitted.
 }}
 <aside class="srladvisor-check-in"
        role="region"
