@@ -1,0 +1,249 @@
+/* eslint-env browser, amd */
+/**
+ * SRL Advisor inline check-in panel (DEC-031 v1.1).
+ *
+ * Lifecycle:
+ *   1. lib.php injects this module via $PAGE->requires->js_call_amd on
+ *      mod-page-view (slice 7).
+ *   2. init(courseid, sectionid, portalUrl) fetches the pending check-in
+ *      via the local_srl_advisor_get_pending_check_in AJAX function.
+ *   3. If has_task, renders the Mustache panel into a mount point and
+ *      wires submit + dismiss handlers.
+ *   4. Submit/dismiss POST through the matching AJAX functions with a
+ *      client-generated Idempotency-Key (UUID v4) so retries don't
+ *      double-record (BLOCKER #4).
+ *
+ * Failure mode contract (DEC-013): any non-success degrades to a no-op
+ * panel + nav badge + portal link remain functional. We surface a
+ * generic error on submit/dismiss failure but never block the page.
+ */
+define([
+    'jquery',
+    'core/ajax',
+    'core/templates',
+    'core/str',
+    'core/notification'
+], function($, Ajax, Templates, Str, Notification) {
+
+    'use strict';
+
+    const MOUNT_ID = 'srladvisor-check-in-mount';
+
+    /**
+     * RFC 4122 v4 UUID using the browser crypto API where available; falls
+     * back to Math.random for environments that don't ship crypto.getRandomValues.
+     */
+    function uuidv4() {
+        if (window.crypto && window.crypto.getRandomValues) {
+            const bytes = new Uint8Array(16);
+            window.crypto.getRandomValues(bytes);
+            bytes[6] = (bytes[6] & 0x0f) | 0x40;
+            bytes[8] = (bytes[8] & 0x3f) | 0x80;
+            const hex = [];
+            for (let i = 0; i < bytes.length; i++) {
+                hex.push((bytes[i] < 16 ? '0' : '') + bytes[i].toString(16));
+            }
+            return (
+                hex.slice(0, 4).join('') + '-' +
+                hex.slice(4, 6).join('') + '-' +
+                hex.slice(6, 8).join('') + '-' +
+                hex.slice(8, 10).join('') + '-' +
+                hex.slice(10, 16).join('')
+            );
+        }
+        return 'xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+
+    function ensureMount() {
+        let mount = document.getElementById(MOUNT_ID);
+        if (mount) {
+            return mount;
+        }
+        mount = document.createElement('div');
+        mount.id = MOUNT_ID;
+        // Default placement: end of #region-main when present, else end of body.
+        const host = document.getElementById('region-main') || document.body;
+        host.appendChild(mount);
+        return mount;
+    }
+
+    function loadStrings() {
+        return Str.get_strings([
+            {key: 'inline_question_pre', component: 'local_srl_advisor'},
+            {key: 'inline_question_post', component: 'local_srl_advisor'},
+            {key: 'inline_submit', component: 'local_srl_advisor'},
+            {key: 'inline_dismiss', component: 'local_srl_advisor'},
+            {key: 'inline_thanks', component: 'local_srl_advisor'},
+            {key: 'inline_error_generic', component: 'local_srl_advisor'},
+            {key: 'inline_portal_fallback_link', component: 'local_srl_advisor'},
+            {key: 'inline_aria_panel', component: 'local_srl_advisor'}
+        ]).then(function(s) {
+            return {
+                question_pre: s[0],
+                question_post: s[1],
+                submit: s[2],
+                dismiss: s[3],
+                thanks: s[4],
+                error_generic: s[5],
+                portal_fallback: s[6],
+                aria_panel: s[7]
+            };
+        });
+    }
+
+    function fetchPending(courseid, sectionid) {
+        return Ajax.call([{
+            methodname: 'local_srl_advisor_get_pending_check_in',
+            args: {courseid: courseid, sectionid: sectionid}
+        }])[0];
+    }
+
+    function submit(courseid, taskid, strategyid, nostrategy, responseTimeMs, idemKey) {
+        return Ajax.call([{
+            methodname: 'local_srl_advisor_submit_check_in',
+            args: {
+                courseid: courseid,
+                taskid: taskid,
+                strategyid: strategyid,
+                nostrategy: nostrategy,
+                responsetimems: responseTimeMs,
+                idempotencykey: idemKey
+            }
+        }])[0];
+    }
+
+    function dismiss(courseid, taskid, reason, idemKey) {
+        return Ajax.call([{
+            methodname: 'local_srl_advisor_dismiss_check_in',
+            args: {
+                courseid: courseid,
+                taskid: taskid,
+                reason: reason || '',
+                idempotencykey: idemKey
+            }
+        }])[0];
+    }
+
+    function renderPanel(mount, task, strings, courseid, portalUrl) {
+        const heading = task.is_pre ? strings.question_pre : strings.question_post;
+        // Server-side already shuffled; ensure each option carries the kind flag the
+        // template branches on. strategy_id=0 + kind=no_strategy triggers the no-strat
+        // branch; strategy_id>0 triggers the strategy branch.
+        const ctx = {
+            task_id: task.task_id,
+            is_pre: task.is_pre,
+            heading: heading,
+            submit_label: strings.submit,
+            dismiss_label: strings.dismiss,
+            portal_fallback_label: strings.portal_fallback,
+            portal_url: portalUrl,
+            aria_label: strings.aria_panel,
+            idempotency_key: uuidv4(),
+            options: task.options
+        };
+        return Templates.render('local_srl_advisor/check_in_panel', ctx).then(function(html) {
+            mount.innerHTML = html;
+            wireHandlers(mount, task, strings, courseid);
+        });
+    }
+
+    function wireHandlers(mount, task, strings, courseid) {
+        const $panel = $(mount).find('.srladvisor-check-in');
+        const $form = $panel.find('[data-srladvisor-form]');
+        const $submit = $panel.find('[data-srladvisor-submit]');
+        const $dismiss = $panel.find('[data-srladvisor-dismiss]');
+        const $status = $panel.find('[data-srladvisor-status]');
+        const renderedAt = Date.now();
+
+        $form.on('submit', function(ev) {
+            ev.preventDefault();
+            const $choice = $panel.find('input[name="srladvisor_choice"]:checked');
+            if ($choice.length === 0) {
+                return;
+            }
+            const strategyId = parseInt($choice.data('strategy-id'), 10) || 0;
+            const noStrategy = $choice.data('no-strategy') === 1 || $choice.data('no-strategy') === '1';
+            const responseTimeMs = Date.now() - renderedAt;
+            const idemKey = $panel.attr('data-idempotency-key');
+
+            $submit.prop('disabled', true);
+            $dismiss.prop('disabled', true);
+
+            submit(courseid, task.task_id, strategyId, noStrategy, responseTimeMs, idemKey).then(function(res) {
+                if (res.ok) {
+                    $status.text(strings.thanks);
+                    $form.find('fieldset').prop('disabled', true);
+                    return;
+                }
+                $status.text(strings.error_generic);
+                $submit.prop('disabled', false);
+                $dismiss.prop('disabled', false);
+                return;
+            }).fail(function(err) {
+                $status.text(strings.error_generic);
+                $submit.prop('disabled', false);
+                $dismiss.prop('disabled', false);
+                Notification.exception(err);
+            });
+        });
+
+        $dismiss.on('click', function() {
+            const idemKey = uuidv4();
+            $submit.prop('disabled', true);
+            $dismiss.prop('disabled', true);
+            dismiss(courseid, task.task_id, '', idemKey).then(function(res) {
+                if (res.ok) {
+                    $panel.remove();
+                    return;
+                }
+                $status.text(strings.error_generic);
+                $submit.prop('disabled', false);
+                $dismiss.prop('disabled', false);
+                return;
+            }).fail(function(err) {
+                $status.text(strings.error_generic);
+                $submit.prop('disabled', false);
+                $dismiss.prop('disabled', false);
+                Notification.exception(err);
+            });
+        });
+    }
+
+    return {
+        /**
+         * Bootstrap entry point invoked by lib.php via js_call_amd.
+         *
+         * @param {Number} courseid     Moodle course id
+         * @param {Number} sectionid    Moodle course_sections.id (NOT sectionnum)
+         * @param {String} portalUrl    Fallback portal launch URL
+         */
+        init: function(courseid, sectionid, portalUrl) {
+            // Defensive — never throw out of an AMD bootstrap and break Moodle's
+            // own JS bundle. Any failure degrades to no panel; nav badge + portal
+            // route remain functional per DEC-013.
+            try {
+                $.when(fetchPending(courseid, sectionid), loadStrings()).then(function(payload, strings) {
+                    if (!payload || !payload.has_task) {
+                        return;
+                    }
+                    const mount = ensureMount();
+                    return renderPanel(mount, payload, strings, courseid, portalUrl);
+                }).fail(function(err) {
+                    // Silent failure on bootstrap — log only at DEBUG_DEVELOPER
+                    // equivalent (console.warn).
+                    if (window.console && console.warn) {
+                        console.warn('local_srl_advisor[inline_get]: bootstrap failed', err);
+                    }
+                });
+            } catch (e) {
+                if (window.console && console.warn) {
+                    console.warn('local_srl_advisor[inline_get]: init exception', e);
+                }
+            }
+        }
+    };
+});

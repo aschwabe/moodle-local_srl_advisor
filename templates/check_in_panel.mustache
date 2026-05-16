@@ -1,0 +1,75 @@
+{{!
+    @template local_srl_advisor/check_in_panel
+
+    Inline unit check-in panel (DEC-031 v1.1).
+
+    Mustache auto-escapes by default — closes the XSS surface that an
+    innerHTML approach would have left open on `label` and `name`/`description`.
+    AMD module renders this server-side template via `core/templates`.
+
+    Context vars:
+        task_id            int
+        is_pre             bool
+        heading            string (already localised via core/str)
+        no_strategy_label  string (already localised)
+        submit_label       string
+        dismiss_label      string
+        portal_fallback_label string
+        portal_url         string  (launch-page URL for the legacy portal flow)
+        aria_label         string
+        idempotency_key    string  (UUID v4 generated client-side)
+        options            array of:
+            kind           'strategy' | 'no_strategy'
+            strategy_id    int (0 for no_strategy)
+            name           string (for kind=strategy)
+            description    string (for kind=strategy)
+            label          string (for kind=no_strategy)
+
+    @example
+        {{< local_srl_advisor/check_in_panel }}
+        {{$ task_id }} 42 {{/ task_id }}
+        {{$ heading }} Before you start... {{/ heading }}
+        {{/ local_srl_advisor/check_in_panel }}
+}}
+<aside class="srladvisor-check-in"
+       role="region"
+       aria-label="{{aria_label}}"
+       data-task-id="{{task_id}}"
+       data-is-pre="{{#is_pre}}1{{/is_pre}}{{^is_pre}}0{{/is_pre}}"
+       data-idempotency-key="{{idempotency_key}}">
+    <h3 class="srladvisor-check-in__heading">{{heading}}</h3>
+    <form class="srladvisor-check-in__form" data-srladvisor-form>
+        <fieldset class="srladvisor-check-in__options">
+            <legend class="sr-only">{{aria_label}}</legend>
+            {{#options}}
+                <label class="srladvisor-check-in__option">
+                    {{#strategy_id}}
+                        <input type="radio"
+                               name="srladvisor_choice"
+                               value="strategy:{{strategy_id}}"
+                               data-strategy-id="{{strategy_id}}"
+                               data-no-strategy="0">
+                        <span class="srladvisor-check-in__option-name">{{name}}</span>
+                        {{#description}}
+                            <span class="srladvisor-check-in__option-desc">{{description}}</span>
+                        {{/description}}
+                    {{/strategy_id}}
+                    {{^strategy_id}}
+                        <input type="radio"
+                               name="srladvisor_choice"
+                               value="no_strategy"
+                               data-strategy-id="0"
+                               data-no-strategy="1">
+                        <span class="srladvisor-check-in__option-name">{{label}}</span>
+                    {{/strategy_id}}
+                </label>
+            {{/options}}
+        </fieldset>
+        <div class="srladvisor-check-in__actions">
+            <button type="submit" class="btn btn-primary" data-srladvisor-submit>{{submit_label}}</button>
+            <button type="button" class="btn btn-secondary" data-srladvisor-dismiss>{{dismiss_label}}</button>
+            <a class="srladvisor-check-in__portal-link" href="{{portal_url}}" target="_blank" rel="noopener">{{portal_fallback_label}}</a>
+        </div>
+        <p class="srladvisor-check-in__status" data-srladvisor-status aria-live="polite"></p>
+    </form>
+</aside>

@@ -30,3 +30,16 @@ $string['privacy:metadata'] = 'The SRL Advisor plugin does not store any persona
 
 // Web service (DEC-017).
 $string['srladvisor_sync_service'] = 'SRL Advisor Sync';
+
+// DEC-031 v1.1 inline check-ins.
+$string['srladvisor_inline_service']      = 'SRL Advisor Inline';
+$string['inline_question_pre']            = 'Before you start this section, what strategy will you use?';
+$string['inline_question_post']           = 'Now that you have finished this section, what strategy did you use?';
+$string['inline_no_strategy_pre']         = "I haven't decided yet";
+$string['inline_no_strategy_post']        = "I didn't have a clear strategy";
+$string['inline_submit']                  = 'Save';
+$string['inline_dismiss']                 = 'Not now';
+$string['inline_thanks']                  = 'Thanks — your response was recorded.';
+$string['inline_error_generic']           = 'We could not save your response. Please try again or open the portal.';
+$string['inline_portal_fallback_link']    = 'Open SRL Advisor portal';
+$string['inline_aria_panel']              = 'SRL Advisor check-in';
