@@ -9,7 +9,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026051604;   // LAB-003 MVP: video telemetry AMD (HTML5/YouTube/Vimeo) reuses the LAB-002 relay path.
+$plugin->version   = 2026051605;   // LAB-003 extension: video.seeked + video.rate_changed across HTML5/YouTube/Vimeo.
 $plugin->requires  = 2024100700;   // Requires Moodle 4.5+ (DEC-031).
 $plugin->component = 'local_srl_advisor';
 $plugin->maturity  = MATURITY_ALPHA;

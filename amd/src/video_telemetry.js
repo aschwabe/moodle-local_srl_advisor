@@ -6,15 +6,16 @@
  * embeds on `mod-page-view`. Emits behavior events to the backend L1 event
  * log via the plugin's relay (same path as scroll telemetry).
  *
- * MVP verb subset (DEC-019 §Piece 1):
- *   video.played   — playback started or resumed.
- *   video.paused   — playback paused.
- *   video.ended    — playback reached the end.
+ * Verb subset (DEC-019 §Piece 1):
+ *   video.played       — playback started or resumed.
+ *   video.paused       — playback paused.
+ *   video.ended        — playback reached the end.
+ *   video.seeked       — playback position jumped (manual seek).
+ *   video.rate_changed — playback speed changed (0.5x, 1.5x, etc).
  *
  * Future extensions (LAB-003 graduation):
- *   video.seeked, video.rate_changed, watch-percent tracking on
- *   .ended, restart vs. resume vs. start subtyping, abandonment-
- *   timing. Out of scope for this MVP.
+ *   watch-percent buckets on .ended, restart vs. resume vs. start
+ *   subtyping, abandonment-timing. Out of scope for this MVP.
  */
 define([
     'core/ajax'
@@ -122,6 +123,7 @@ define([
                 const html5 = document.querySelectorAll('video');
                 html5.forEach(function(v) {
                     const idx = videoIndex++;
+                    let seekFromPosition = 0;
                     v.addEventListener('play', function() {
                         emit('video.played', idx, {
                             position_s: Math.round(v.currentTime || 0),
@@ -141,6 +143,21 @@ define([
                             : 100;
                         emit('video.ended', idx, {watch_pct: watchPct}, sessionId + ':html5:' + idx + ':end');
                     });
+                    // 'seeking' fires BEFORE the seek lands → capture origin.
+                    // 'seeked' fires AFTER the seek completes → emit with from/to.
+                    v.addEventListener('seeking', function() {
+                        seekFromPosition = Math.round(v.currentTime || 0);
+                    });
+                    v.addEventListener('seeked', function() {
+                        const to = Math.round(v.currentTime || 0);
+                        if (Math.abs(to - seekFromPosition) < 1) {
+                            return;  // Sub-second autocorrect, not a user seek.
+                        }
+                        emit('video.seeked', idx, {from_s: seekFromPosition, to_s: to});
+                    });
+                    v.addEventListener('ratechange', function() {
+                        emit('video.rate_changed', idx, {playback_rate: v.playbackRate});
+                    });
                 });
 
                 // -------- YouTube iframes --------
@@ -158,6 +175,12 @@ define([
                         const start = function() {
                             ytIframes.forEach(function(iframe) {
                                 const idx = videoIndex++;
+                                // Heartbeat tracks the "expected" position so a
+                                // BUFFERING event with a wide position-jump can
+                                // be classified as a seek (YouTube doesn't fire
+                                // a dedicated seek event on the iframe API).
+                                let expectedPosition = 0;
+                                let heartbeat = null;
                                 /* global YT */
                                 new YT.Player(iframe, {
                                     events: {
@@ -166,12 +189,28 @@ define([
                                             const d = Math.round(ev.target.getDuration() || 0);
                                             if (ev.data === YT.PlayerState.PLAYING) {
                                                 emit('video.played', idx, {position_s: t, duration_s: d});
+                                                if (!heartbeat) {
+                                                    heartbeat = window.setInterval(function() {
+                                                        expectedPosition = Math.round(ev.target.getCurrentTime() || 0);
+                                                    }, 1000);
+                                                }
                                             } else if (ev.data === YT.PlayerState.PAUSED) {
                                                 emit('video.paused', idx, {position_s: t});
                                             } else if (ev.data === YT.PlayerState.ENDED) {
+                                                if (heartbeat) { window.clearInterval(heartbeat); heartbeat = null; }
                                                 const pct = d > 0 ? Math.round((t / d) * 100) : 100;
                                                 emit('video.ended', idx, {watch_pct: pct}, sessionId + ':yt:' + idx + ':end');
+                                            } else if (ev.data === YT.PlayerState.BUFFERING) {
+                                                // Heuristic seek detection: position-jump > 2s vs.
+                                                // the heartbeat's expected position.
+                                                if (Math.abs(t - expectedPosition) > 2 && expectedPosition > 0) {
+                                                    emit('video.seeked', idx, {from_s: expectedPosition, to_s: t});
+                                                    expectedPosition = t;
+                                                }
                                             }
+                                        },
+                                        onPlaybackRateChange: function(ev) {
+                                            emit('video.rate_changed', idx, {playback_rate: ev.data});
                                         }
                                     }
                                 });
@@ -195,6 +234,7 @@ define([
                     loadScriptOnce(VIMEO_API_SRC).then(function() {
                         vimeoIframes.forEach(function(iframe) {
                             const idx = videoIndex++;
+                            let lastPosition = 0;
                             /* global Vimeo */
                             const player = new Vimeo.Player(iframe);
                             player.on('play', function(d) {
@@ -211,6 +251,21 @@ define([
                                     ? Math.round((d.seconds / d.duration) * 100)
                                     : 100;
                                 emit('video.ended', idx, {watch_pct: pct}, sessionId + ':vimeo:' + idx + ':end');
+                            });
+                            // Vimeo's `timeupdate` runs ~4 times/s during playback.
+                            // We capture the last-known position so 'seeked' can
+                            // emit a from_s.
+                            player.on('timeupdate', function(d) {
+                                lastPosition = Math.round(d.seconds || 0);
+                            });
+                            player.on('seeked', function(d) {
+                                const to = Math.round(d.seconds || 0);
+                                if (Math.abs(to - lastPosition) < 1) { return; }
+                                emit('video.seeked', idx, {from_s: lastPosition, to_s: to});
+                                lastPosition = to;
+                            });
+                            player.on('playbackratechange', function(d) {
+                                emit('video.rate_changed', idx, {playback_rate: d.playbackRate});
                             });
                         });
                     }).catch(function(e) {
