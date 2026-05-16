@@ -1,0 +1,26 @@
+{
+  "env": {
+    "browser": true,
+    "amd": true,
+    "es2022": true
+  },
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "script"
+  },
+  "globals": {
+    "M": "readonly",
+    "Y": "readonly",
+    "require": "readonly",
+    "define": "readonly"
+  },
+  "rules": {
+    "no-unused-vars": "warn",
+    "no-console": "warn",
+    "semi": ["error", "always"],
+    "quotes": ["error", "single", {"avoidEscape": true}],
+    "eqeqeq": ["error", "always"],
+    "no-var": "error",
+    "prefer-const": "warn"
+  }
+}
