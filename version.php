@@ -9,7 +9,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026051603;   // LAB-002 MVP: scroll telemetry AMD + record_behavior_events relay external function (writes to backend L1 tbl_behavior_event via DEC-035 ingest).
+$plugin->version   = 2026051604;   // LAB-003 MVP: video telemetry AMD (HTML5/YouTube/Vimeo) reuses the LAB-002 relay path.
 $plugin->requires  = 2024100700;   // Requires Moodle 4.5+ (DEC-031).
 $plugin->component = 'local_srl_advisor';
 $plugin->maturity  = MATURITY_ALPHA;

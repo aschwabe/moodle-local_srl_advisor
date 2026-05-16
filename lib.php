@@ -369,6 +369,15 @@ function local_srl_advisor_before_footer() {
                 'init',
                 [$courseid, $sectionid, $pagetype]
             );
+
+            // LAB-003 video telemetry — same mod-page gate. AMD self-detects
+            // HTML5 <video>, YouTube iframes, and Vimeo iframes; bails fast
+            // if none are present so empty Pages pay no overhead.
+            $PAGE->requires->js_call_amd(
+                'local_srl_advisor/video_telemetry',
+                'init',
+                [$courseid, $sectionid, $pagetype]
+            );
         }
     }
 
