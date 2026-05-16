@@ -63,6 +63,8 @@ function local_srl_advisor_build_jwt($courseid, $pseudonymous_id, $api_token) {
  * @param array|null $body    JSON-encoded on POST; ignored on GET.
  * @param string $jwt         Signed Bearer token.
  * @param int    $timeout     Seconds. Default 3 — never block Moodle nav longer than that.
+ * @param array  $extra_headers Optional extra HTTP headers (e.g. Idempotency-Key).
+ *                              Each entry is the full header line, e.g. 'Idempotency-Key: <uuid>'.
  * @return array {
  *   bool ok,
  *   int http_code,
@@ -71,7 +73,7 @@ function local_srl_advisor_build_jwt($courseid, $pseudonymous_id, $api_token) {
  *   string|null error_kind,  'transport' | 'backend' | 'parse' | null on success
  * }
  */
-function local_srl_advisor_relay_backend_call($category, $path, $method, $body, $jwt, $timeout = 3) {
+function local_srl_advisor_relay_backend_call($category, $path, $method, $body, $jwt, $timeout = 3, $extra_headers = []) {
     // Defensive: refuse arbitrary paths even if upstream construction is broken.
     if (strpos($path, '/api/v1/') !== 0) {
         debugging(
@@ -96,6 +98,9 @@ function local_srl_advisor_relay_backend_call($category, $path, $method, $body, 
     $headers = ["Authorization: Bearer $jwt"];
     if ($method === 'POST' && $body !== null) {
         $headers[] = 'Content-Type: application/json';
+    }
+    foreach ($extra_headers as $h) {
+        $headers[] = $h;
     }
 
     $ch = curl_init($url);

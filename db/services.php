@@ -27,6 +27,32 @@ $functions = [
         'ajax'          => false,
         'loginrequired' => true,
     ],
+
+    // DEC-031 v1.1 inline check-ins — AJAX, enrolment-gated (no custom capability).
+    'local_srl_advisor_get_pending_check_in' => [
+        'classname'     => 'local_srl_advisor\\external\\get_pending_check_in',
+        'methodname'    => 'execute',
+        'description'   => 'Returns the pending unit check-in payload (or empty struct) for the current user, course and section. Used by the inline AMD module.',
+        'type'          => 'read',
+        'ajax'          => true,
+        'loginrequired' => true,
+    ],
+    'local_srl_advisor_submit_check_in' => [
+        'classname'     => 'local_srl_advisor\\external\\submit_check_in',
+        'methodname'    => 'execute',
+        'description'   => 'Submits the inline check-in choice (strategy or no_strategy). Requires a client-generated Idempotency-Key to suppress duplicate POSTs on retry.',
+        'type'          => 'write',
+        'ajax'          => true,
+        'loginrequired' => true,
+    ],
+    'local_srl_advisor_dismiss_check_in' => [
+        'classname'     => 'local_srl_advisor\\external\\dismiss_check_in',
+        'methodname'    => 'execute',
+        'description'   => 'Records an inline-panel dismissal. Does NOT complete the underlying task — the nav badge keeps surfacing it as pending work.',
+        'type'          => 'write',
+        'ajax'          => true,
+        'loginrequired' => true,
+    ],
 ];
 
 $services = [
@@ -39,6 +65,21 @@ $services = [
         'restrictedusers'  => 1,
         'enabled'          => 1,
         'shortname'        => 'local_srl_advisor_sync',
+        'downloadfiles'    => 0,
+        'uploadfiles'      => 0,
+    ],
+    // DEC-031 Q3 resolution: NEW service, separate auth posture from sync.
+    // restrictedusers=0 + loginrequired=true means any logged-in Moodle user
+    // (enrolment is checked inside each function), not a webservice-token user.
+    'SRL Advisor Inline' => [
+        'functions'        => [
+            'local_srl_advisor_get_pending_check_in',
+            'local_srl_advisor_submit_check_in',
+            'local_srl_advisor_dismiss_check_in',
+        ],
+        'restrictedusers'  => 0,
+        'enabled'          => 1,
+        'shortname'        => 'local_srl_advisor_inline',
         'downloadfiles'    => 0,
         'uploadfiles'      => 0,
     ],
