@@ -26,7 +26,9 @@ function local_srl_advisor_build_jwt($courseid, $pseudonymous_id, $api_token) {
     global $CFG;
 
     $issued_at  = time();
-    $expires_at = $issued_at + 60; // Short TTL — API call only, not a browser launch.
+    // DEC-031 BLOCKER #4 (c): 30s TTL — halves the replay window. POSTs are
+    // also protected by Idempotency-Key + service-layer SELECT...FOR UPDATE.
+    $expires_at = $issued_at + 30;
 
     $header  = rtrim(strtr(base64_encode(json_encode(['alg' => 'HS256', 'typ' => 'JWT'])), '+/', '-_'), '=');
     $payload = rtrim(strtr(base64_encode(json_encode([
@@ -44,44 +46,150 @@ function local_srl_advisor_build_jwt($courseid, $pseudonymous_id, $api_token) {
 }
 
 /**
+ * Shared HTTP relay to the SRL Advisor backend.
+ *
+ * DEC-031 BLOCKER #3 resolution: single helper for every backend call from
+ * the plugin (nav-badge, inline GET, inline POST, inline dismiss). Encodes
+ * the DEC-029 hardening lessons:
+ *   - distinguishes transport failure (curl errno) from backend error (non-2xx)
+ *   - logs body slice on non-2xx only (never on success, avoids debug bloat)
+ *   - tags every log line with $category so subsystems have separate grep
+ *     channels (`local_srl_advisor[badge]`, `[inline_get]`, `[inline_post]`,
+ *     `[inline_dismiss]`, `[sync]`)
+ *
+ * @param string $category    'badge' | 'inline_get' | 'inline_post' | 'inline_dismiss' | 'sync'
+ * @param string $path        Must start with '/api/v1/'.
+ * @param string $method      'GET' or 'POST'.
+ * @param array|null $body    JSON-encoded on POST; ignored on GET.
+ * @param string $jwt         Signed Bearer token.
+ * @param int    $timeout     Seconds. Default 3 — never block Moodle nav longer than that.
+ * @return array {
+ *   bool ok,
+ *   int http_code,
+ *   mixed|null data,         JSON-decoded body on 2xx, null otherwise
+ *   string raw,              Raw response body
+ *   string|null error_kind,  'transport' | 'backend' | 'parse' | null on success
+ * }
+ */
+function local_srl_advisor_relay_backend_call($category, $path, $method, $body, $jwt, $timeout = 3) {
+    // Defensive: refuse arbitrary paths even if upstream construction is broken.
+    if (strpos($path, '/api/v1/') !== 0) {
+        debugging(
+            "local_srl_advisor[{$category}]: refused non-/api/v1 path ({$path})",
+            DEBUG_DEVELOPER
+        );
+        return ['ok' => false, 'http_code' => 0, 'data' => null, 'raw' => '', 'error_kind' => 'transport'];
+    }
+
+    $backend_url = trim((string)get_config('local_srl_advisor', 'backend_url'));
+    if (empty($backend_url)) {
+        debugging(
+            "local_srl_advisor[{$category}]: backend_url not configured",
+            DEBUG_DEVELOPER
+        );
+        return ['ok' => false, 'http_code' => 0, 'data' => null, 'raw' => '', 'error_kind' => 'transport'];
+    }
+
+    $url = rtrim($backend_url, '/') . $path;
+    $insecure_ssl = (bool)get_config('local_srl_advisor', 'insecure_ssl');
+
+    $headers = ["Authorization: Bearer $jwt"];
+    if ($method === 'POST' && $body !== null) {
+        $headers[] = 'Content-Type: application/json';
+    }
+
+    $ch = curl_init($url);
+    $opts = [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => $timeout,
+        CURLOPT_HTTPHEADER     => $headers,
+        CURLOPT_SSL_VERIFYPEER => $insecure_ssl ? false : true,
+        CURLOPT_SSL_VERIFYHOST => $insecure_ssl ? 0 : 2,
+    ];
+    if ($method === 'POST') {
+        $opts[CURLOPT_POST] = true;
+        $opts[CURLOPT_POSTFIELDS] = $body === null ? '' : json_encode($body);
+    }
+    curl_setopt_array($ch, $opts);
+
+    $response  = curl_exec($ch);
+    $curl_errno = curl_errno($ch);
+    $curl_err   = curl_error($ch);
+    $http_code  = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    // Transport failure — curl could not complete the round-trip.
+    if ($response === false || $curl_errno !== 0) {
+        debugging(
+            "local_srl_advisor[{$category}]: transport failure (url={$url}, errno={$curl_errno}, err={$curl_err})",
+            DEBUG_DEVELOPER
+        );
+        return [
+            'ok' => false,
+            'http_code' => $http_code,
+            'data' => null,
+            'raw' => (string)$response,
+            'error_kind' => 'transport',
+        ];
+    }
+
+    // Backend reachable but returned a non-2xx status — log body slice.
+    if ($http_code < 200 || $http_code >= 300) {
+        debugging(
+            "local_srl_advisor[{$category}]: backend {$http_code} (url={$url}, body=" . substr((string)$response, 0, 200) . ")",
+            DEBUG_DEVELOPER
+        );
+        return [
+            'ok' => false,
+            'http_code' => $http_code,
+            'data' => null,
+            'raw' => (string)$response,
+            'error_kind' => 'backend',
+        ];
+    }
+
+    $data = json_decode((string)$response, true);
+    if ($data === null && json_last_error() !== JSON_ERROR_NONE) {
+        debugging(
+            "local_srl_advisor[{$category}]: JSON parse error (url={$url}, json_err=" . json_last_error_msg() . ")",
+            DEBUG_DEVELOPER
+        );
+        return [
+            'ok' => false,
+            'http_code' => $http_code,
+            'data' => null,
+            'raw' => (string)$response,
+            'error_kind' => 'parse',
+        ];
+    }
+
+    return [
+        'ok' => true,
+        'http_code' => $http_code,
+        'data' => $data,
+        'raw' => (string)$response,
+        'error_kind' => null,
+    ];
+}
+
+
+/**
  * Calls the SRL Advisor action-items API and returns the pending count.
  * Returns 0 silently on any error so a slow or unreachable backend never
  * breaks Moodle navigation.
  *
- * @param string $backend_url   Base URL of the SRL Advisor backend.
+ * Thin wrapper over `local_srl_advisor_relay_backend_call` (DEC-031 BLOCKER #3).
+ *
+ * @param string $backend_url   Unused — kept for backwards-compat with callers.
  * @param string $jwt           Signed JWT for Bearer authentication.
  * @return int  Number of pending action items (0 on error).
  */
 function local_srl_advisor_get_pending_count($backend_url, $jwt) {
-    $url = rtrim($backend_url, '/') . '/api/v1/action-items';
-
-    // Allow insecure SSL for dev/self-signed backends via plugin config.
-    $insecure_ssl = (bool)get_config('local_srl_advisor', 'insecure_ssl');
-
-    $ch = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => 3, // Never block navigation for more than 3 seconds.
-        CURLOPT_HTTPHEADER     => ["Authorization: Bearer $jwt"],
-        CURLOPT_SSL_VERIFYPEER => $insecure_ssl ? false : true,
-        CURLOPT_SSL_VERIFYHOST => $insecure_ssl ? 0 : 2,
-    ]);
-
-    $response  = curl_exec($ch);
-    $curl_err  = curl_error($ch);
-    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    if ($response === false || $http_code !== 200) {
-        debugging(
-            "local_srl_advisor: action-items call failed (url=$url, http=$http_code, err=$curl_err, body=" . substr((string)$response, 0, 200) . ")",
-            DEBUG_DEVELOPER
-        );
+    $result = local_srl_advisor_relay_backend_call('badge', '/api/v1/action-items', 'GET', null, $jwt);
+    if (!$result['ok']) {
         return 0;
     }
-
-    $data = json_decode($response, true);
-    return isset($data['pending_count']) ? (int)$data['pending_count'] : 0;
+    return isset($result['data']['pending_count']) ? (int)$result['data']['pending_count'] : 0;
 }
 
 /**
