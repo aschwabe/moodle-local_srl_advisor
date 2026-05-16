@@ -61,6 +61,10 @@ $services = [
             'local_srl_advisor_get_enrolled_hashed_users',
             'gradereport_user_get_grade_items',
             'core_completion_get_activities_completion_status',
+            // DEC-032: course-level completion trigger for the summative survey.
+            // Sync orchestrator calls this only when both org + course
+            // `summative_survey_enabled` are true.
+            'core_completion_get_course_completion_status',
         ],
         'restrictedusers'  => 1,
         'enabled'          => 1,

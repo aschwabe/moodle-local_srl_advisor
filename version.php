@@ -9,7 +9,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026051601;   // DEC-032: summative banner on course-view-* + mod-page-view; new lang strings + Mustache template.
+$plugin->version   = 2026051602;   // DEC-032 follow-up: include core_completion_get_course_completion_status in the sync service so the summative trigger can read course-level completion.
 $plugin->requires  = 2024100700;   // Requires Moodle 4.5+ (DEC-031).
 $plugin->component = 'local_srl_advisor';
 $plugin->maturity  = MATURITY_ALPHA;
