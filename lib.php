@@ -304,10 +304,16 @@ function local_srl_advisor_before_footer() {
     if (!isloggedin() || isguestuser()) {
         return;
     }
-    if (empty($PAGE->course) || empty($PAGE->course->id)) {
+
+    // $PAGE->course is a magic-getter property on moodle_page. Read via local
+    // variable so PHP's `empty()` does not double-resolve through __isset()
+    // (which is not defined on moodle_page and produces inconsistent results
+    // depending on internal page state).
+    $course = $PAGE->course ?? null;
+    if (!$course || empty($course->id)) {
         return;
     }
-    $courseid = (int)$PAGE->course->id;
+    $courseid = (int)$course->id;
 
     // Plugin configured?
     $backend_url = trim((string)get_config('local_srl_advisor', 'backend_url'));
@@ -333,12 +339,13 @@ function local_srl_advisor_before_footer() {
     }
 
     // Section id resolution — Moodle convention: $PAGE->cm->section is the
-    // course_sections.id (NOT sectionnum). Bail if cm or section is missing.
-    if (empty($PAGE->cm) || empty($PAGE->cm->section)) {
+    // course_sections.id (NOT sectionnum). Same magic-getter caveat as above.
+    $cm = $PAGE->cm ?? null;
+    if (!$cm || empty($cm->section)) {
         debugging('local_srl_advisor[inline_get]: mod-page-view without $PAGE->cm->section', DEBUG_DEVELOPER);
         return;
     }
-    $sectionid = (int)$PAGE->cm->section;
+    $sectionid = (int)$cm->section;
 
     // Portal fallback URL — clicked from inside the panel if AMD/AJAX fails.
     $portal_url = (new moodle_url('/local/srl_advisor/launch.php', ['courseid' => $courseid]))->out(false);
