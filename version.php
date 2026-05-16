@@ -9,8 +9,8 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026051600;   // DEC-031 v1.1 inline check-ins: 3 new AJAX external fns + local_srl_advisor_inline service + shared relay helper + JWT TTL 30s.
-$plugin->requires  = 2024100700;   // Requires Moodle 4.5+ (DEC-031: bumped to match actual test target across institutions).
+$plugin->version   = 2026051601;   // DEC-032: summative banner on course-view-* + mod-page-view; new lang strings + Mustache template.
+$plugin->requires  = 2024100700;   // Requires Moodle 4.5+ (DEC-031).
 $plugin->component = 'local_srl_advisor';
 $plugin->maturity  = MATURITY_ALPHA;
-$plugin->release   = 'v0.3.0-alpha';
+$plugin->release   = 'v0.4.0-alpha';

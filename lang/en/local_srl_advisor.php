@@ -43,3 +43,8 @@ $string['inline_thanks']                  = 'Thanks — your response was record
 $string['inline_error_generic']           = 'We could not save your response. Please try again or open the portal.';
 $string['inline_portal_fallback_link']    = 'Open SRL Advisor portal';
 $string['inline_aria_panel']              = 'SRL Advisor check-in';
+
+// DEC-032 end-of-course summative survey banner.
+$string['summative_banner_heading'] = 'You\'ve finished the course!';
+$string['summative_banner_cta']     = 'Please take a few minutes to complete the post-course survey. Your reflections help us improve the course for future students.';
+$string['summative_banner_link']    = 'Open the post-course survey';

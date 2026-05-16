@@ -295,8 +295,14 @@ function local_srl_advisor_extend_navigation_course($navigation, $course, $conte
 function local_srl_advisor_before_footer() {
     global $PAGE, $USER, $CFG;
 
-    // Page-type gate.
-    if (empty($PAGE) || $PAGE->pagetype !== 'mod-page-view') {
+    if (empty($PAGE)) {
+        return;
+    }
+
+    $pagetype = (string)$PAGE->pagetype;
+    $is_mod_page  = ($pagetype === 'mod-page-view');
+    $is_course    = (strpos($pagetype, 'course-view-') === 0);
+    if (!$is_mod_page && !$is_course) {
         return;
     }
 
@@ -338,23 +344,59 @@ function local_srl_advisor_before_footer() {
         return;
     }
 
-    // Section id resolution — Moodle convention: $PAGE->cm->section is the
-    // course_sections.id (NOT sectionnum). Same magic-getter caveat as above.
-    $cm = $PAGE->cm ?? null;
-    if (!$cm || empty($cm->section)) {
-        debugging('local_srl_advisor[inline_get]: mod-page-view without $PAGE->cm->section', DEBUG_DEVELOPER);
+    // --- v1.1 inline check-in AMD inject (mod-page-view only, DEC-031) ----
+    if ($is_mod_page) {
+        $cm = $PAGE->cm ?? null;
+        if (!$cm || empty($cm->section)) {
+            debugging('local_srl_advisor[inline_get]: mod-page-view without $PAGE->cm->section', DEBUG_DEVELOPER);
+        } else {
+            $sectionid = (int)$cm->section;
+            $portal_url = (new moodle_url('/local/srl_advisor/launch.php', ['courseid' => $courseid]))->out(false);
+            debugging("local_srl_advisor[inline_get]: injecting AMD (courseid={$courseid}, sectionid={$sectionid})", DEBUG_DEVELOPER);
+            $PAGE->requires->js_call_amd(
+                'local_srl_advisor/check_in',
+                'init',
+                [$courseid, $sectionid, $portal_url]
+            );
+        }
+    }
+
+    // --- DEC-032 end-of-course summative banner -------------------------
+    // Render on every gated course-view-* AND mod-page-view render so the
+    // student sees the prompt regardless of where they land after finishing
+    // the course. Single backend round-trip per render; no AMD/AJAX.
+    $pseudonymous_id = hash('sha256', $USER->id . $CFG->siteidentifier);
+    $jwt = local_srl_advisor_build_jwt($courseid, $pseudonymous_id, $api_token);
+    $result = local_srl_advisor_relay_backend_call('banner', '/api/v1/action-items', 'GET', null, $jwt);
+    if (!$result['ok']) {
         return;
     }
-    $sectionid = (int)$cm->section;
+    $items = $result['data']['items'] ?? [];
+    $has_summative = false;
+    foreach ($items as $item) {
+        if (isset($item['type']) && $item['type'] === 'summative_survey') {
+            $has_summative = true;
+            break;
+        }
+    }
+    if (!$has_summative) {
+        return;
+    }
 
-    // Portal fallback URL — clicked from inside the panel if AMD/AJAX fails.
+    // Portal launch URL — same as nav-badge; backend's /launch routes the
+    // student into the consent/dashboard flow which surfaces the survey card.
     $portal_url = (new moodle_url('/local/srl_advisor/launch.php', ['courseid' => $courseid]))->out(false);
+    $heading = get_string('summative_banner_heading', 'local_srl_advisor');
+    $cta     = get_string('summative_banner_cta', 'local_srl_advisor');
+    $link    = get_string('summative_banner_link', 'local_srl_advisor');
 
-    debugging("local_srl_advisor[inline_get]: injecting AMD (courseid={$courseid}, sectionid={$sectionid})", DEBUG_DEVELOPER);
-
-    $PAGE->requires->js_call_amd(
-        'local_srl_advisor/check_in',
-        'init',
-        [$courseid, $sectionid, $portal_url]
-    );
+    // Server-side render. Mustache auto-escapes; safe against any future
+    // string-injection vectors in the lang file.
+    global $OUTPUT;
+    return $OUTPUT->render_from_template('local_srl_advisor/summative_banner', [
+        'heading'    => $heading,
+        'cta'        => $cta,
+        'link_label' => $link,
+        'portal_url' => $portal_url,
+    ]);
 }

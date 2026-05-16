@@ -1,0 +1,24 @@
+{{!
+    @template local_srl_advisor/summative_banner
+
+    End-of-course summative survey banner (DEC-032). Rendered server-side
+    from local_srl_advisor_before_footer when /api/v1/action-items reports
+    a pending summative_survey task. Mustache auto-escapes; no AMD wiring.
+
+    Context vars:
+        heading     string (already localised)
+        cta         string (already localised)
+        link_label  string (already localised; on the anchor)
+        portal_url  string (launch URL routed to the survey card)
+}}
+<section class="srladvisor-summative-banner alert alert-info"
+         role="status"
+         aria-live="polite">
+    <h3 class="srladvisor-summative-banner__heading">{{heading}}</h3>
+    <p class="srladvisor-summative-banner__cta">{{cta}}</p>
+    <p>
+        <a class="btn btn-primary" href="{{portal_url}}" target="_blank" rel="noopener">
+            {{link_label}}
+        </a>
+    </p>
+</section>
