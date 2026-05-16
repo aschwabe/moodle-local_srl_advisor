@@ -358,6 +358,17 @@ function local_srl_advisor_before_footer() {
                 'init',
                 [$courseid, $sectionid, $portal_url]
             );
+
+            // LAB-002 scroll telemetry — same mod-page gate. Backend ingest
+            // gated by participant consent (resolved server-side per the
+            // /api/v1/behavior-events JWT decode); AMD fires on every
+            // enrolled mod-page-view and any non-consented events get
+            // 404'd at /behavior-events.
+            $PAGE->requires->js_call_amd(
+                'local_srl_advisor/scroll_telemetry',
+                'init',
+                [$courseid, $sectionid, $pagetype]
+            );
         }
     }
 

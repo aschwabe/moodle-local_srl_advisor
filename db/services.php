@@ -53,6 +53,19 @@ $functions = [
         'ajax'          => true,
         'loginrequired' => true,
     ],
+
+    // LAB-002 / DEC-035: behavior-event L1 batch relay. AMD modules POST
+    // batches of {verb, occurred_at, payload, ...} events through this AJAX
+    // function; the function builds a fresh JWT and forwards to backend
+    // POST /api/v1/behavior-events.
+    'local_srl_advisor_record_behavior_events' => [
+        'classname'     => 'local_srl_advisor\\external\\record_behavior_events',
+        'methodname'    => 'execute',
+        'description'   => 'Batched behavior-event relay (scroll/video/clipboard/perf). Forwards to backend L1 ingest endpoint.',
+        'type'          => 'write',
+        'ajax'          => true,
+        'loginrequired' => true,
+    ],
 ];
 
 $services = [
@@ -80,6 +93,7 @@ $services = [
             'local_srl_advisor_get_pending_check_in',
             'local_srl_advisor_submit_check_in',
             'local_srl_advisor_dismiss_check_in',
+            'local_srl_advisor_record_behavior_events',
         ],
         'restrictedusers'  => 0,
         'enabled'          => 1,
