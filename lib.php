@@ -270,3 +270,84 @@ function local_srl_advisor_extend_navigation_course($navigation, $course, $conte
 
     $navigation->add_node($node);
 }
+
+/**
+ * Moodle legacy callback fired before the page footer renders.
+ *
+ * DEC-031 v1.1 inline check-ins. Gates the inline AMD module to:
+ *   - mod-page-view only (Q1 resolution; widen post-pilot)
+ *   - logged-in, non-guest, enrolled students (BLOCKER #2)
+ *   - admin allowlist of enabled courses (matches nav-badge gate)
+ *   - plugin configured (backend_url + api_token set)
+ *
+ * Any gate miss is a silent no-op. AMD bootstrap itself swallows
+ * AJAX failures, so the worst-case outcome is "no panel" — never a
+ * page render error.
+ *
+ * Section id resolves from `$PAGE->cm->section` (course_sections.id,
+ * NOT sectionnum). Passed through to the backend GET.
+ *
+ * Hook system note (re-eval CONSIDER #10): we stay on the legacy
+ * `local_srl_advisor_before_footer()` callback because it works on
+ * Moodle 4.1+ and survives backports. The 4.6+ `db/hooks.php` system
+ * shrinks future older-version compatibility surface.
+ */
+function local_srl_advisor_before_footer() {
+    global $PAGE, $USER, $CFG;
+
+    // Page-type gate.
+    if (empty($PAGE) || $PAGE->pagetype !== 'mod-page-view') {
+        return;
+    }
+
+    // User gate — logged-in, non-guest, enrolled in this course.
+    if (!isloggedin() || isguestuser()) {
+        return;
+    }
+    if (empty($PAGE->course) || empty($PAGE->course->id)) {
+        return;
+    }
+    $courseid = (int)$PAGE->course->id;
+
+    // Plugin configured?
+    $backend_url = trim((string)get_config('local_srl_advisor', 'backend_url'));
+    $api_token   = trim((string)get_config('local_srl_advisor', 'api_token'));
+    if (empty($backend_url) || empty($api_token)) {
+        return;
+    }
+
+    // Course in allowlist?
+    $enabled_ids_raw = (string)get_config('local_srl_advisor', 'enabled_course_ids');
+    if (empty($enabled_ids_raw)) {
+        return;
+    }
+    $enabled_ids = array_map('trim', explode(',', $enabled_ids_raw));
+    if (!in_array((string)$courseid, $enabled_ids, true)) {
+        return;
+    }
+
+    // Enrolment gate (BLOCKER #2) — same posture as nav-badge.
+    $context = context_course::instance($courseid);
+    if (!is_enrolled($context, $USER, '', true)) {
+        return;
+    }
+
+    // Section id resolution — Moodle convention: $PAGE->cm->section is the
+    // course_sections.id (NOT sectionnum). Bail if cm or section is missing.
+    if (empty($PAGE->cm) || empty($PAGE->cm->section)) {
+        debugging('local_srl_advisor[inline_get]: mod-page-view without $PAGE->cm->section', DEBUG_DEVELOPER);
+        return;
+    }
+    $sectionid = (int)$PAGE->cm->section;
+
+    // Portal fallback URL — clicked from inside the panel if AMD/AJAX fails.
+    $portal_url = (new moodle_url('/local/srl_advisor/launch.php', ['courseid' => $courseid]))->out(false);
+
+    debugging("local_srl_advisor[inline_get]: injecting AMD (courseid={$courseid}, sectionid={$sectionid})", DEBUG_DEVELOPER);
+
+    $PAGE->requires->js_call_amd(
+        'local_srl_advisor/check_in',
+        'init',
+        [$courseid, $sectionid, $portal_url]
+    );
+}
