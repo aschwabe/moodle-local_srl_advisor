@@ -264,10 +264,14 @@ function local_srl_advisor_extend_navigation_course($navigation, $course, $conte
     $pending_count = local_srl_advisor_get_pending_count($backend_url, $jwt);
     debugging("local_srl_advisor: pending_count={$pending_count} — rendering nav node", DEBUG_DEVELOPER);
 
-    // Build the nav label — append badge count when there are pending items.
+    // Build the nav label — append a Bootstrap pill badge when there are pending items.
+    // Boost theme ships Bootstrap 4/5 utility classes; Moodle's nav renderer emits label HTML
+    // unescaped, so the span renders as a red rounded-pill next to the link text.
     $label = get_string('nav_link', 'local_srl_advisor');
     if ($pending_count > 0) {
-        $label .= ' (' . $pending_count . ')';
+        $label .= ' <span class="badge bg-danger text-white rounded-pill ms-1">'
+            . (int)$pending_count
+            . '</span>';
     }
 
     // Build the URL for the launch page, passing the current course ID.
