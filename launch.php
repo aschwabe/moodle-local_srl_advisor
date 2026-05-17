@@ -31,12 +31,20 @@ $context = context_course::instance($courseid);
 require_capability('mod/assign:view', $context); // Must be enrolled.
 
 // --- Retrieve plugin configuration ---
-$backend_url = rtrim(trim(get_config('local_srl_advisor', 'backend_url')), '/');
-$api_token   = trim(get_config('local_srl_advisor', 'api_token'));
+$backend_url        = rtrim(trim(get_config('local_srl_advisor', 'backend_url')), '/');
+$public_backend_url = rtrim(trim(get_config('local_srl_advisor', 'public_backend_url')), '/');
+$api_token          = trim(get_config('local_srl_advisor', 'api_token'));
 
 if (empty($backend_url) || empty($api_token)) {
     throw new moodle_exception('Plugin is not configured. Please ask your administrator to set the Backend URL and API Token.');
 }
+
+// `backend_url` is the server-to-server URL (e.g., host.containers.internal:8000)
+// used by the plugin's curl calls. The browser cannot resolve container-internal
+// hostnames, so the launch redirect must use a user-facing URL. Falls back to
+// backend_url for institutions where the backend is reachable at the same address
+// from both the Moodle host and the student's browser.
+$redirect_base = !empty($public_backend_url) ? $public_backend_url : $backend_url;
 
 // --- Build the JWT Payload ---
 // We pseudonymize the user: instead of sending their real ID, we derive a
@@ -57,7 +65,7 @@ $jwt = local_srl_advisor_build_jwt(
 // --- Auto-submit POST form to Python backend ---
 // We use an auto-submitting form to ensure the JWT is sent via POST (not GET),
 // which prevents it from appearing in browser history or server logs.
-$launch_url = $backend_url . '/launch';
+$launch_url = $redirect_base . '/launch';
 
 echo $OUTPUT->header();
 ?>

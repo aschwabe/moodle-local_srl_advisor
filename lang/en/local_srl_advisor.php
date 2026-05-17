@@ -16,8 +16,10 @@ $string['pluginname'] = 'SRL Advisor';
 $string['nav_link'] = 'SRL Advisor';
 
 // Admin settings page.
-$string['settings_backend_url']            = 'SRL Advisor Backend URL';
-$string['settings_backend_url_desc']       = 'The base URL of the SRL Advisor web application (e.g., https://srladvisor.example.com). Do not include a trailing slash.';
+$string['settings_backend_url']            = 'SRL Advisor Backend URL (server-to-server)';
+$string['settings_backend_url_desc']       = 'The base URL the Moodle server uses to reach the SRL Advisor web application for API calls (e.g., https://srladvisor.example.com, or http://host.containers.internal:8000 for a container lab). Do not include a trailing slash.';
+$string['settings_public_backend_url']     = 'SRL Advisor Public URL (browser-facing)';
+$string['settings_public_backend_url_desc'] = 'Optional. The URL the student\'s browser uses to reach the SRL Advisor web application during launch redirects. Set this when the Moodle server reaches the backend over an internal hostname the browser cannot resolve (e.g., http://127.0.0.1:8000 in a local container lab). Falls back to the Backend URL when empty. Do not include a trailing slash.';
 $string['settings_api_token']              = 'Organization API Token';
 $string['settings_api_token_desc']         = 'The unique API token generated from the SRL Advisor Superadmin portal for this institution. This is used to sign the JWTs.';
 $string['settings_enabled_course_ids']     = 'Enabled Course IDs';
@@ -43,6 +45,7 @@ $string['inline_thanks']                  = 'Thanks — your response was record
 $string['inline_error_generic']           = 'We could not save your response. Please try again or open the portal.';
 $string['inline_portal_fallback_link']    = 'Open SRL Advisor portal';
 $string['inline_aria_panel']              = 'SRL Advisor check-in';
+$string['inline_placeholder']             = 'Pick one…';
 
 // DEC-032 end-of-course summative survey banner.
 $string['summative_banner_heading'] = 'You\'ve finished the course!';

@@ -370,13 +370,39 @@ function local_srl_advisor_before_footer() {
             debugging('local_srl_advisor[inline_get]: mod-page-view without $PAGE->cm->section', DEBUG_DEVELOPER);
         } else {
             $sectionid = (int)$cm->section;
-            $portal_url = (new moodle_url('/local/srl_advisor/launch.php', ['courseid' => $courseid]))->out(false);
-            debugging("local_srl_advisor[inline_get]: injecting AMD (courseid={$courseid}, sectionid={$sectionid})", DEBUG_DEVELOPER);
-            $PAGE->requires->js_call_amd(
-                'local_srl_advisor/check_in',
-                'init',
-                [$courseid, $sectionid, $portal_url]
-            );
+
+            // DEC-048 (v1.1.1 UX patch): one pre per unit + one post per unit,
+            // section-scoped. Pre renders only on the section's first cm;
+            // post renders only on the section's last cm. Middle cms get no
+            // panel. Single-cm section emits pre only (no post, by design —
+            // a section with one page has no meaningful "after engagement"
+            // boundary distinct from the pre prompt).
+            global $DB;
+            $sequence = (string)$DB->get_field('course_sections', 'sequence', ['id' => $sectionid]);
+            $cm_ids = array_values(array_filter(array_map('intval', explode(',', $sequence))));
+            $current_cmid = (int)$cm->id;
+            $is_first = !empty($cm_ids) && $cm_ids[0] === $current_cmid;
+            $is_last  = !empty($cm_ids) && end($cm_ids) === $current_cmid;
+            $is_single = count($cm_ids) === 1;
+
+            $phase = null;
+            if ($is_single || $is_first) {
+                $phase = 'pre';
+            } elseif ($is_last) {
+                $phase = 'post';
+            }
+
+            if ($phase === null) {
+                debugging("local_srl_advisor[inline_get]: skip — cmid={$current_cmid} is middle of section {$sectionid} (sequence=" . implode(',', $cm_ids) . ')', DEBUG_DEVELOPER);
+            } else {
+                $portal_url = (new moodle_url('/local/srl_advisor/launch.php', ['courseid' => $courseid]))->out(false);
+                debugging("local_srl_advisor[inline_get]: injecting AMD (courseid={$courseid}, sectionid={$sectionid}, cmid={$current_cmid}, phase={$phase}, first={$is_first}, last={$is_last}, single={$is_single})", DEBUG_DEVELOPER);
+                $PAGE->requires->js_call_amd(
+                    'local_srl_advisor/check_in',
+                    'init',
+                    [$courseid, $sectionid, $portal_url, $phase]
+                );
+            }
 
             // LAB-002 scroll telemetry — same mod-page gate. Backend ingest
             // gated by participant consent (resolved server-side per the

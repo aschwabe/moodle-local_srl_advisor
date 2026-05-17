@@ -12,12 +12,26 @@ defined('MOODLE_INTERNAL') || die();
 if ($hassiteconfig) {
     $settings = new admin_settingpage('local_srl_advisor', get_string('pluginname', 'local_srl_advisor'));
 
-    // Backend URL: The base URL of the SRL Advisor FastAPI web application.
+    // Backend URL: The base URL of the SRL Advisor FastAPI web application,
+    // as reachable from the Moodle server (server-to-server curl calls).
     $settings->add(new admin_setting_configtext(
         'local_srl_advisor/backend_url',
         get_string('settings_backend_url', 'local_srl_advisor'),
         get_string('settings_backend_url_desc', 'local_srl_advisor'),
         'https://srladvisor.example.com',
+        PARAM_URL
+    ));
+
+    // Public Backend URL: The browser-facing URL used for the launch redirect.
+    // Required when Moodle runs in a container that reaches the backend via an
+    // internal hostname the student's browser cannot resolve. Leave empty if the
+    // backend is reachable at the same address from both the Moodle host and the
+    // student's browser.
+    $settings->add(new admin_setting_configtext(
+        'local_srl_advisor/public_backend_url',
+        get_string('settings_public_backend_url', 'local_srl_advisor'),
+        get_string('settings_public_backend_url_desc', 'local_srl_advisor'),
+        '',
         PARAM_URL
     ));
 

@@ -28,6 +28,8 @@ define([
     'use strict';
 
     const MOUNT_ID = 'srladvisor-check-in-mount';
+    const PHASE_PRE = 'pre';
+    const PHASE_POST = 'post';
 
     /**
      * RFC 4122 v4 UUID using the browser crypto API where available; falls
@@ -58,16 +60,22 @@ define([
         });
     }
 
-    function ensureMount() {
+    function ensureMount(phase) {
         let mount = document.getElementById(MOUNT_ID);
         if (mount) {
             return mount;
         }
         mount = document.createElement('div');
         mount.id = MOUNT_ID;
-        // Default placement: end of #region-main when present, else end of body.
+        // DEC-048: phase=pre mounts at TOP of #region-main (intent before
+        // engagement); phase=post mounts at BOTTOM (reflection after
+        // engagement). Falls back to body when #region-main is absent.
         const host = document.getElementById('region-main') || document.body;
-        host.appendChild(mount);
+        if (phase === PHASE_PRE) {
+            host.insertBefore(mount, host.firstChild);
+        } else {
+            host.appendChild(mount);
+        }
         return mount;
     }
 
@@ -80,7 +88,8 @@ define([
             {key: 'inline_thanks', component: 'local_srl_advisor'},
             {key: 'inline_error_generic', component: 'local_srl_advisor'},
             {key: 'inline_portal_fallback_link', component: 'local_srl_advisor'},
-            {key: 'inline_aria_panel', component: 'local_srl_advisor'}
+            {key: 'inline_aria_panel', component: 'local_srl_advisor'},
+            {key: 'inline_placeholder', component: 'local_srl_advisor'}
         ]).then(function(s) {
             return {
                 question_pre: s[0],
@@ -90,7 +99,8 @@ define([
                 thanks: s[4],
                 error_generic: s[5],
                 portal_fallback: s[6],
-                aria_panel: s[7]
+                aria_panel: s[7],
+                placeholder: s[8]
             };
         });
     }
@@ -143,6 +153,7 @@ define([
             portal_url: portalUrl,
             aria_label: strings.aria_panel,
             idempotency_key: uuidv4(),
+            placeholder_label: strings.placeholder,
             options: task.options
         };
         return Templates.render('local_srl_advisor/check_in_panel', ctx).then(function(html) {
@@ -154,19 +165,41 @@ define([
     function wireHandlers(mount, task, strings, courseid) {
         const $panel = $(mount).find('.srladvisor-check-in');
         const $form = $panel.find('[data-srladvisor-form]');
+        const $select = $panel.find('[data-srladvisor-select]');
+        const $description = $panel.find('[data-srladvisor-description]');
         const $submit = $panel.find('[data-srladvisor-submit]');
         const $dismiss = $panel.find('[data-srladvisor-dismiss]');
         const $status = $panel.find('[data-srladvisor-status]');
         const renderedAt = Date.now();
 
+        // DEC-048: keep submit disabled until the student picks a non-placeholder
+        // option. Description block mirrors the selected option's data-description.
+        function syncSelection() {
+            const $opt = $select.find('option:selected');
+            const value = $select.val();
+            const desc = $opt.attr('data-description') || '';
+            $description.text(desc);
+            $submit.prop('disabled', !value);
+        }
+        $select.on('change', syncSelection);
+
+        // DEC-048: for post tasks, pre-select the strategy the student picked at
+        // pre time so the dropdown reads "you said X — was it?". previous_strategy_id
+        // is 0 when no pre on file or pre was no_strategy.
+        if (!task.is_pre && task.previous_strategy_id) {
+            $select.val('strategy:' + task.previous_strategy_id);
+        }
+        syncSelection();
+
         $form.on('submit', function(ev) {
             ev.preventDefault();
-            const $choice = $panel.find('input[name="srladvisor_choice"]:checked');
-            if ($choice.length === 0) {
+            const $opt = $select.find('option:selected');
+            const value = $select.val();
+            if (!value) {
                 return;
             }
-            const strategyId = parseInt($choice.data('strategy-id'), 10) || 0;
-            const noStrategy = $choice.data('no-strategy') === 1 || $choice.data('no-strategy') === '1';
+            const strategyId = parseInt($opt.attr('data-strategy-id'), 10) || 0;
+            const noStrategy = $opt.attr('data-no-strategy') === '1';
             const responseTimeMs = Date.now() - renderedAt;
             const idemKey = $panel.attr('data-idempotency-key');
 
@@ -176,7 +209,7 @@ define([
             submit(courseid, task.task_id, strategyId, noStrategy, responseTimeMs, idemKey).then(function(res) {
                 if (res.ok) {
                     $status.text(strings.thanks);
-                    $form.find('fieldset').prop('disabled', true);
+                    $select.prop('disabled', true);
                     return;
                 }
                 $status.text(strings.error_generic);
@@ -220,17 +253,34 @@ define([
          * @param {Number} courseid     Moodle course id
          * @param {Number} sectionid    Moodle course_sections.id (NOT sectionnum)
          * @param {String} portalUrl    Fallback portal launch URL
+         * @param {String} phase        DEC-048: 'pre' or 'post'. Drives mount
+         *                              placement (top vs bottom of #region-main)
+         *                              and is sanity-checked against the
+         *                              backend-returned task.is_pre.
          */
-        init: function(courseid, sectionid, portalUrl) {
+        init: function(courseid, sectionid, portalUrl, phase) {
             // Defensive — never throw out of an AMD bootstrap and break Moodle's
             // own JS bundle. Any failure degrades to no panel; nav badge + portal
             // route remain functional per DEC-013.
+            const resolvedPhase = (phase === PHASE_POST) ? PHASE_POST : PHASE_PRE;
             try {
                 $.when(fetchPending(courseid, sectionid), loadStrings()).then(function(payload, strings) {
                     if (!payload || !payload.has_task) {
                         return;
                     }
-                    const mount = ensureMount();
+                    // DEC-048 sanity gate: only render the panel when the
+                    // backend's pending task matches the page-position phase
+                    // lib.php asked for. Avoids rendering a pre panel at the
+                    // bottom of the last page (or vice versa) if backend state
+                    // and section sequence drift.
+                    const taskIsPre = !!payload.is_pre;
+                    if (resolvedPhase === PHASE_PRE && !taskIsPre) {
+                        return;
+                    }
+                    if (resolvedPhase === PHASE_POST && taskIsPre) {
+                        return;
+                    }
+                    const mount = ensureMount(resolvedPhase);
                     return renderPanel(mount, payload, strings, courseid, portalUrl);
                 }).fail(function(err) {
                     // Silent failure on bootstrap — log only at DEBUG_DEVELOPER

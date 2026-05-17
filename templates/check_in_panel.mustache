@@ -1,11 +1,19 @@
 {{!
     @template local_srl_advisor/check_in_panel
 
-    Inline unit check-in panel (DEC-031 v1.1).
+    Inline unit check-in panel (DEC-031 v1.1 + DEC-048 v1.1.1 UX patch).
 
     Mustache auto-escapes by default - closes the XSS surface that an
     innerHTML approach would have left open on label and name/description.
     AMD module renders this server-side template via core/templates.
+
+    DEC-048 changes:
+      - Strategy options render as <select> dropdown (was: radio fieldset)
+        so panel footprint is tight on long Moodle pages.
+      - Default option = "Pick one…" placeholder; submit blocked until a
+        real option is selected.
+      - Description for the currently-selected option renders in a
+        live-updating block below the select; AMD wires the change handler.
 
     Context vars:
         task_id                int
@@ -17,6 +25,7 @@
         portal_url             string  (launch-page URL for the legacy portal flow)
         aria_label             string
         idempotency_key        string  (UUID v4 generated client-side)
+        placeholder_label      string  ("Pick one…" — localised)
         options                array of {kind, strategy_id, name, description, label}
 
     NB: an @example block containing nested Mustache section tags would itself
@@ -30,34 +39,33 @@
        data-idempotency-key="{{idempotency_key}}">
     <h3 class="srladvisor-check-in__heading">{{heading}}</h3>
     <form class="srladvisor-check-in__form" data-srladvisor-form>
-        <fieldset class="srladvisor-check-in__options">
-            <legend class="sr-only">{{aria_label}}</legend>
-            {{#options}}
-                <label class="srladvisor-check-in__option">
+        <label class="srladvisor-check-in__select-label" for="srladvisor-choice-{{task_id}}">
+            <span class="sr-only">{{aria_label}}</span>
+            <select class="form-control srladvisor-check-in__select"
+                    id="srladvisor-choice-{{task_id}}"
+                    name="srladvisor_choice"
+                    data-srladvisor-select
+                    required>
+                <option value="" data-strategy-id="0" data-no-strategy="0" data-description="" selected>{{placeholder_label}}</option>
+                {{#options}}
                     {{#strategy_id}}
-                        <input type="radio"
-                               name="srladvisor_choice"
-                               value="strategy:{{strategy_id}}"
-                               data-strategy-id="{{strategy_id}}"
-                               data-no-strategy="0">
-                        <span class="srladvisor-check-in__option-name">{{name}}</span>
-                        {{#description}}
-                            <span class="srladvisor-check-in__option-desc">{{description}}</span>
-                        {{/description}}
+                        <option value="strategy:{{strategy_id}}"
+                                data-strategy-id="{{strategy_id}}"
+                                data-no-strategy="0"
+                                data-description="{{description}}">{{name}}</option>
                     {{/strategy_id}}
                     {{^strategy_id}}
-                        <input type="radio"
-                               name="srladvisor_choice"
-                               value="no_strategy"
-                               data-strategy-id="0"
-                               data-no-strategy="1">
-                        <span class="srladvisor-check-in__option-name">{{label}}</span>
+                        <option value="no_strategy"
+                                data-strategy-id="0"
+                                data-no-strategy="1"
+                                data-description="">{{label}}</option>
                     {{/strategy_id}}
-                </label>
-            {{/options}}
-        </fieldset>
+                {{/options}}
+            </select>
+        </label>
+        <p class="srladvisor-check-in__description" data-srladvisor-description aria-live="polite"></p>
         <div class="srladvisor-check-in__actions">
-            <button type="submit" class="btn btn-primary" data-srladvisor-submit>{{submit_label}}</button>
+            <button type="submit" class="btn btn-primary" data-srladvisor-submit disabled>{{submit_label}}</button>
             <button type="button" class="btn btn-secondary" data-srladvisor-dismiss>{{dismiss_label}}</button>
             <a class="srladvisor-check-in__portal-link" href="{{portal_url}}" target="_blank" rel="noopener">{{portal_fallback_label}}</a>
         </div>

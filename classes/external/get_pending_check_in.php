@@ -97,6 +97,7 @@ class get_pending_check_in extends external_api {
             'label'                 => (string)($task['label'] ?? ''),
             'section_id'            => (int)($task['section_id'] ?? 0),
             'options'               => $options,
+            'previous_strategy_id'  => isset($task['previous_strategy_id']) ? (int)$task['previous_strategy_id'] : 0,
             'render_started_at_ms'  => (int)($task['render_started_at_ms'] ?? 0),
         ];
     }
@@ -110,6 +111,7 @@ class get_pending_check_in extends external_api {
             'label'                 => '',
             'section_id'            => 0,
             'options'               => [],
+            'previous_strategy_id'  => 0,
             'render_started_at_ms'  => 0,
         ];
     }
@@ -131,6 +133,7 @@ class get_pending_check_in extends external_api {
                     'label'        => new external_value(PARAM_TEXT, 'No-strategy label (kind=no_strategy)'),
                 ])
             ),
+            'previous_strategy_id' => new external_value(PARAM_INT, 'Strategy_id from this participant\'s pre answer in the same section (0 = none / no_strategy)'),
             'render_started_at_ms' => new external_value(PARAM_INT, 'Server-stamped epoch ms; AMD subtracts to compute response_time_ms'),
         ]);
     }
