@@ -9,7 +9,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026051706;   // DEC-048 follow-up: branded CSS + Page-only first/last + section_label JWT claim → portal labels include unit name.
+$plugin->version   = 2026051707;   // Migrate before_footer to Moodle 4.5 hook API (db/hooks.php + classes/hook/before_footer.php); kills deprecation notice.
 $plugin->requires  = 2024100700;   // Requires Moodle 4.5+ (DEC-031).
 $plugin->component = 'local_srl_advisor';
 $plugin->maturity  = MATURITY_ALPHA;

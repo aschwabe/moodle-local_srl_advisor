@@ -302,7 +302,15 @@ function local_srl_advisor_extend_navigation_course($navigation, $course, $conte
 }
 
 /**
- * Moodle legacy callback fired before the page footer renders.
+ * Renderer fired before the page footer. Invoked by the Moodle 4.5+ hook
+ * listener in `classes/hook/before_footer.php`, which is registered in
+ * `db/hooks.php` against `core\hook\output\before_footer_html_generation`.
+ *
+ * The legacy `local_srl_advisor_before_footer()` name was renamed to
+ * `local_srl_advisor_render_before_footer()` to prevent Moodle's
+ * `process_legacy_callbacks()` from auto-invoking it as a deprecated
+ * callback (which would emit a developer-debug notice AND double-fire
+ * everything in here alongside the hook listener).
  *
  * DEC-031 v1.1 inline check-ins. Gates the inline AMD module to:
  *   - mod-page-view only (Q1 resolution; widen post-pilot)
@@ -316,13 +324,8 @@ function local_srl_advisor_extend_navigation_course($navigation, $course, $conte
  *
  * Section id resolves from `$PAGE->cm->section` (course_sections.id,
  * NOT sectionnum). Passed through to the backend GET.
- *
- * Hook system note (re-eval CONSIDER #10): we stay on the legacy
- * `local_srl_advisor_before_footer()` callback because it works on
- * Moodle 4.1+ and survives backports. The 4.6+ `db/hooks.php` system
- * shrinks future older-version compatibility surface.
  */
-function local_srl_advisor_before_footer() {
+function local_srl_advisor_render_before_footer() {
     global $PAGE, $USER, $CFG;
 
     if (empty($PAGE)) {
