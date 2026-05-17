@@ -428,9 +428,12 @@ function local_srl_advisor_render_before_footer() {
     }
 
     $pagetype = (string)$PAGE->pagetype;
-    $is_mod_page  = ($pagetype === 'mod-page-view');
+    $is_mod_page    = ($pagetype === 'mod-page-view');
+    $is_mod_assign  = ($pagetype === 'mod-assign-view');
+    $is_mod_quiz    = ($pagetype === 'mod-quiz-view');
+    $is_mod_activity = $is_mod_page || $is_mod_assign || $is_mod_quiz;
     $is_course    = (strpos($pagetype, 'course-view-') === 0);
-    if (!$is_mod_page && !$is_course) {
+    if (!$is_mod_activity && !$is_course) {
         return;
     }
 
@@ -472,66 +475,44 @@ function local_srl_advisor_render_before_footer() {
         return;
     }
 
-    // --- v1.1 inline check-in AMD inject (mod-page-view only, DEC-031) ----
-    if ($is_mod_page) {
+    // --- v1.1 inline check-in AMD inject (DEC-031 + DEC-048 follow-up) ----
+    // Widened from mod-page-view-only to also include mod-assign-view and
+    // mod-quiz-view so the post check-in can render on a section's last
+    // activity (typically the Reflection / Assignment), not just on a Reading
+    // Page. First/last positions now computed against ALL cms in the section
+    // sequence — pre fires on whichever cm the student lands on first, post
+    // fires on the last cm. Single-cm sections render both on the same cm.
+    if ($is_mod_activity) {
         $cm = $PAGE->cm ?? null;
         if (!$cm || empty($cm->section)) {
-            debugging('local_srl_advisor[inline_get]: mod-page-view without $PAGE->cm->section', DEBUG_DEVELOPER);
+            debugging('local_srl_advisor[inline_get]: mod-*-view without $PAGE->cm->section', DEBUG_DEVELOPER);
         } else {
             $sectionid = (int)$cm->section;
-
-            // DEC-048 (v1.1.1 UX patch): one pre per unit + one post per unit,
-            // section-scoped. Pre on first Page-type cm in section; post on
-            // last Page-type cm. v1.1 is mod-page-view gated (DEC-031 Q1) so
-            // we MUST count Page-type cms only — a section ordered as
-            // [Page, Quiz, Assignment] would otherwise never emit post,
-            // because Assignment is the last cm but AMD never runs there.
-            //
-            // Single-Page section: the Page is both first and last; AMD
-            // renders pre (top) on initial visit and post (bottom) once the
-            // student has answered pre + the post-task gate fires.
             global $DB;
             $sequence = (string)$DB->get_field('course_sections', 'sequence', ['id' => $sectionid]);
-            $cm_ids_raw = array_values(array_filter(array_map('intval', explode(',', $sequence))));
+            $cm_ids = array_values(array_filter(array_map('intval', explode(',', $sequence))));
             $current_cmid = (int)$cm->id;
-            $page_module_id = (int)$DB->get_field('modules', 'id', ['name' => 'page']);
-            $page_cm_ids = [];
-            if (!empty($cm_ids_raw) && $page_module_id > 0) {
-                list($insql, $inparams) = $DB->get_in_or_equal($cm_ids_raw, SQL_PARAMS_NAMED);
-                $records = $DB->get_records_select(
-                    'course_modules',
-                    "id {$insql} AND module = :pageid",
-                    array_merge($inparams, ['pageid' => $page_module_id]),
-                    '',
-                    'id'
-                );
-                foreach ($cm_ids_raw as $cmid_in_seq) {
-                    if (isset($records[$cmid_in_seq])) {
-                        $page_cm_ids[] = $cmid_in_seq;
-                    }
-                }
-            }
-            $is_first_page = !empty($page_cm_ids) && $page_cm_ids[0] === $current_cmid;
-            $is_last_page  = !empty($page_cm_ids) && end($page_cm_ids) === $current_cmid;
+            $is_first = !empty($cm_ids) && $cm_ids[0] === $current_cmid;
+            $is_last  = !empty($cm_ids) && end($cm_ids) === $current_cmid;
 
-            // Pass BOTH phases when the page is simultaneously first and last
-            // (single-Page section). AMD's per-mount phase gate decides which
-            // panel to render based on the backend-returned task.is_pre.
+            // Same cm is both first and last (single-cm section) → emit both
+            // phases. AMD's per-phase mount + sanity gate decides which panel
+            // renders based on the backend's pending task.
             $phases = [];
-            if ($is_first_page) {
+            if ($is_first) {
                 $phases[] = 'pre';
             }
-            if ($is_last_page && !$is_first_page) {
+            if ($is_last && !$is_first) {
                 $phases[] = 'post';
-            } elseif ($is_first_page && $is_last_page) {
+            } elseif ($is_first && $is_last) {
                 $phases[] = 'post';
             }
 
             if (empty($phases)) {
-                debugging("local_srl_advisor[inline_get]: skip — cmid={$current_cmid} is not a first/last Page in section {$sectionid} (page_cms=" . implode(',', $page_cm_ids) . ')', DEBUG_DEVELOPER);
+                debugging("local_srl_advisor[inline_get]: skip — cmid={$current_cmid} is not first/last in section {$sectionid} (sequence=" . implode(',', $cm_ids) . ')', DEBUG_DEVELOPER);
             } else {
                 $portal_url = (new moodle_url('/local/srl_advisor/launch.php', ['courseid' => $courseid]))->out(false);
-                debugging("local_srl_advisor[inline_get]: injecting AMD (courseid={$courseid}, sectionid={$sectionid}, cmid={$current_cmid}, phases=" . implode('+', $phases) . ", first_page={$is_first_page}, last_page={$is_last_page})", DEBUG_DEVELOPER);
+                debugging("local_srl_advisor[inline_get]: injecting AMD (courseid={$courseid}, sectionid={$sectionid}, cmid={$current_cmid}, pagetype={$pagetype}, phases=" . implode('+', $phases) . ", first={$is_first}, last={$is_last})", DEBUG_DEVELOPER);
                 foreach ($phases as $phase) {
                     $PAGE->requires->js_call_amd(
                         'local_srl_advisor/check_in',
@@ -541,25 +522,23 @@ function local_srl_advisor_render_before_footer() {
                 }
             }
 
-            // LAB-002 scroll telemetry — same mod-page gate. Backend ingest
-            // gated by participant consent (resolved server-side per the
-            // /api/v1/behavior-events JWT decode); AMD fires on every
-            // enrolled mod-page-view and any non-consented events get
-            // 404'd at /behavior-events.
-            $PAGE->requires->js_call_amd(
-                'local_srl_advisor/scroll_telemetry',
-                'init',
-                [$courseid, $sectionid, $pagetype]
-            );
-
-            // LAB-003 video telemetry — same mod-page gate. AMD self-detects
-            // HTML5 <video>, YouTube iframes, and Vimeo iframes; bails fast
-            // if none are present so empty Pages pay no overhead.
-            $PAGE->requires->js_call_amd(
-                'local_srl_advisor/video_telemetry',
-                'init',
-                [$courseid, $sectionid, $pagetype]
-            );
+            // LAB-002 scroll + LAB-003 video telemetry — Page-view only. Quiz
+            // and Assignment pages have their own content models (interactive
+            // forms, submission UIs) where scroll-depth and embedded-video
+            // signals don't map to the reading-engagement question these labs
+            // measure. Keep the original mod-page-view gate.
+            if ($is_mod_page) {
+                $PAGE->requires->js_call_amd(
+                    'local_srl_advisor/scroll_telemetry',
+                    'init',
+                    [$courseid, $sectionid, $pagetype]
+                );
+                $PAGE->requires->js_call_amd(
+                    'local_srl_advisor/video_telemetry',
+                    'init',
+                    [$courseid, $sectionid, $pagetype]
+                );
+            }
         }
     }
 

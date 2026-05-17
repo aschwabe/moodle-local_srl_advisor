@@ -9,7 +9,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026051709;   // DEC-048 follow-up: bootstrap tooltip on top-right navbar icon (data-toggle/data-bs-toggle).
+$plugin->version   = 2026051710;   // Widen inline AMD gate to mod-assign-view + mod-quiz-view; post check-in now fires on section's last cm (Reflection).
 $plugin->requires  = 2024100700;   // Requires Moodle 4.5+ (DEC-031).
 $plugin->component = 'local_srl_advisor';
 $plugin->maturity  = MATURITY_ALPHA;
