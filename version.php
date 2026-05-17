@@ -9,7 +9,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026051708;   // DEC-048 follow-up: 'Other' option + portal copy + green success + top-right navbar badge.
+$plugin->version   = 2026051709;   // DEC-048 follow-up: bootstrap tooltip on top-right navbar icon (data-toggle/data-bs-toggle).
 $plugin->requires  = 2024100700;   // Requires Moodle 4.5+ (DEC-031).
 $plugin->component = 'local_srl_advisor';
 $plugin->maturity  = MATURITY_ALPHA;

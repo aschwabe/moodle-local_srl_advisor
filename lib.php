@@ -368,6 +368,9 @@ function local_srl_advisor_render_navbar_output(\renderer_base $renderer): strin
 
     $launch_url = (new \moodle_url('/local/srl_advisor/launch.php', ['courseid' => $courseid]))->out(false);
     $aria = get_string('nav_link', 'local_srl_advisor');
+    $tooltip = $pending_count > 0
+        ? get_string('navbar_tooltip_with_pending', 'local_srl_advisor', $pending_count)
+        : get_string('navbar_tooltip_no_pending', 'local_srl_advisor');
     $badge_html = '';
     if ($pending_count > 0) {
         $badge_html = '<span class="badge bg-danger text-white rounded-pill srladvisor-navbar__badge">'
@@ -376,9 +379,17 @@ function local_srl_advisor_render_navbar_output(\renderer_base $renderer): strin
             . '</span>';
     }
 
+    // Bootstrap tooltip via data-toggle="tooltip" — Moodle Boost initialises
+    // tooltips on navbar elements automatically. data-placement="bottom" so
+    // the bubble drops below the user-menu strip without colliding with the
+    // page header. The native `title` attribute is the fallback when JS is
+    // disabled or the tooltip plugin failed to load.
     return '<div class="popover-region srladvisor-navbar">'
         . '<a class="nav-link srladvisor-navbar__link" href="' . htmlspecialchars($launch_url) . '" '
-        . 'title="' . s($aria) . '" aria-label="' . s($aria) . '">'
+        . 'title="' . s($tooltip) . '" '
+        . 'aria-label="' . s($tooltip) . '" '
+        . 'data-toggle="tooltip" data-bs-toggle="tooltip" '
+        . 'data-placement="bottom" data-bs-placement="bottom">'
         . '<i class="icon fa fa-graduation-cap fa-fw" aria-hidden="true"></i>'
         . $badge_html
         . '</a>'

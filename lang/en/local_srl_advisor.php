@@ -49,6 +49,8 @@ $string['inline_placeholder']             = 'Pick one…';
 $string['inline_other_label']             = 'Tell us briefly which strategy you have in mind';
 $string['inline_other_placeholder']       = 'In your own words (max 200 chars)…';
 $string['inline_other_required']          = 'Please describe the strategy before saving.';
+$string['navbar_tooltip_no_pending']      = 'SRL Advisor — your learning-strategy companion';
+$string['navbar_tooltip_with_pending']    = 'SRL Advisor — {$a} pending check-in(s)';
 
 // DEC-032 end-of-course summative survey banner.
 $string['summative_banner_heading'] = 'You\'ve finished the course!';
