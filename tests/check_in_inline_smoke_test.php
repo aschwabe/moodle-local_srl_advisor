@@ -54,14 +54,49 @@ class local_srl_advisor_check_in_inline_smoke_test extends advanced_testcase {
         $parts = explode('.', $jwt);
         $this->assertCount(3, $parts);
 
-        $payload = json_decode(
-            base64_decode(strtr($parts[1], '-_', '+/') . str_repeat('=', (4 - strlen($parts[1]) % 4) % 4)),
-            true
-        );
-        $this->assertIsArray($payload);
+        $payload = $this->decode_jwt_payload($parts[1]);
         $this->assertArrayHasKey('iat', $payload);
         $this->assertArrayHasKey('exp', $payload);
         $this->assertSame(30, (int)$payload['exp'] - (int)$payload['iat']);
+        // section_id default is null — preserves backward-compatible payload shape.
+        $this->assertArrayHasKey('section_id', $payload);
+        $this->assertNull($payload['section_id']);
+    }
+
+    public function test_jwt_launch_override_uses_300_second_ttl_and_section_id() {
+        // DEC-043: launch.php delegates to local_srl_advisor_build_jwt with
+        // ttl=300 + non-null section_id. Same canonical mint, different
+        // claim values. Locks the launch-flow override against drift.
+        $this->resetAfterTest();
+        $jwt = local_srl_advisor_build_jwt(42, 'pseudo', 'secret', 300, 7);
+        $parts = explode('.', $jwt);
+        $this->assertCount(3, $parts);
+
+        $payload = $this->decode_jwt_payload($parts[1]);
+        $this->assertSame(300, (int)$payload['exp'] - (int)$payload['iat']);
+        $this->assertSame(7, $payload['section_id']);
+    }
+
+    public function test_jwt_emits_urlsafe_base64_segments() {
+        // DEC-043 / DEC-039: every segment must be RFC 7515 URL-safe base64
+        // (no '+', '/', or '=' padding). Backend PyJWT decoder is tolerant of
+        // standard base64 but standardising both ends closes the cross-impl
+        // fragility latent in pre-DEC-043 launch.php.
+        $this->resetAfterTest();
+        $jwt = local_srl_advisor_build_jwt(42, 'pseudo', 'secret', 300, 7);
+        foreach (explode('.', $jwt) as $segment) {
+            $this->assertStringNotContainsString('+', $segment);
+            $this->assertStringNotContainsString('/', $segment);
+            $this->assertStringNotContainsString('=', $segment);
+        }
+    }
+
+    /** URL-safe base64 → JSON-decoded payload claim array. */
+    private function decode_jwt_payload(string $segment): array {
+        $padded = strtr($segment, '-_', '+/') . str_repeat('=', (4 - strlen($segment) % 4) % 4);
+        $decoded = json_decode(base64_decode($padded), true);
+        $this->assertIsArray($decoded);
+        return $decoded;
     }
 
     public function test_get_pending_check_in_requires_login() {

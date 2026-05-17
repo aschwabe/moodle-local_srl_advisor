@@ -16,6 +16,7 @@
  */
 
 require_once(__DIR__ . '/../../config.php');
+require_once(__DIR__ . '/lib.php');
 
 // Ensure the user is logged in before we do anything.
 require_login();
@@ -42,30 +43,16 @@ if (empty($backend_url) || empty($api_token)) {
 // deterministic hash so the Python app can identify them without PII.
 $pseudonymous_id = hash('sha256', $USER->id . $CFG->siteidentifier);
 
-// JWT standard claims.
-$issued_at  = time();
-$expires_at = $issued_at + 300; // Token valid for 5 minutes (enough to bridge to the app).
-
-$header = base64_encode(json_encode(['alg' => 'HS256', 'typ' => 'JWT']));
-
-$payload = base64_encode(json_encode([
-    'iss'        => parse_url($CFG->wwwroot, PHP_URL_HOST), // Moodle instance domain.
-    'sub'        => $pseudonymous_id,                       // Pseudonymous participant ID.
-    'course_id'  => $courseid,                              // The Moodle Course ID.
-    'section_id' => $sectionid,                             // Optional: Moodle section for micro-surveys.
-    'iat'        => $issued_at,
-    'exp'        => $expires_at,
-]));
-
-// Sign the JWT using HMAC-SHA256 with the org API token as the secret.
-$signature = base64_encode(hash_hmac(
-    'sha256',
-    "$header.$payload",
+// Delegate to the canonical plugin mint (DEC-043). 300s TTL covers the
+// student's redirect from Moodle → backend; section_id is optional for
+// the micro-survey routing path.
+$jwt = local_srl_advisor_build_jwt(
+    $courseid,
+    $pseudonymous_id,
     $api_token,
-    true
-));
-
-$jwt = "$header.$payload.$signature";
+    300,
+    $sectionid
+);
 
 // --- Auto-submit POST form to Python backend ---
 // We use an auto-submitting form to ensure the JWT is sent via POST (not GET),

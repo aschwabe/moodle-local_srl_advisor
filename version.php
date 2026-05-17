@@ -9,7 +9,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026051605;   // LAB-003 extension: video.seeked + video.rate_changed across HTML5/YouTube/Vimeo.
+$plugin->version   = 2026051701;   // DEC-043: single canonical JWT mint — launch.php delegates to local_srl_advisor_build_jwt with TTL + section_id params.
 $plugin->requires  = 2024100700;   // Requires Moodle 4.5+ (DEC-031).
 $plugin->component = 'local_srl_advisor';
 $plugin->maturity  = MATURITY_ALPHA;

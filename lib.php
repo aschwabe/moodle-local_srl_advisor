@@ -15,27 +15,42 @@ defined('MOODLE_INTERNAL') || die();
 
 /**
  * Builds a signed JWT for server-to-server calls to the SRL Advisor API.
- * Uses the same signing scheme as launch.php so the backend can verify it.
  *
- * @param int    $courseid       Moodle course ID.
- * @param string $pseudonymous_id SHA-256 hash of user ID + site identifier.
- * @param string $api_token      Org API token used as the HMAC signing secret.
+ * Single canonical mint for the plugin (DEC-043, todo #16). Both the
+ * launch.php student-bridge flow AND every AJAX-relay flow go through
+ * this function. RFC 7515 URL-safe base64 with stripped padding —
+ * matches the PyJWT-backed verifier on the backend (DEC-039).
+ *
+ * @param int      $courseid        Moodle course ID.
+ * @param string   $pseudonymous_id SHA-256 hash of user ID + site identifier.
+ * @param string   $api_token       Org API token used as the HMAC signing secret.
+ * @param int      $ttl_seconds     Token validity window in seconds. Defaults
+ *                                  to 30 (DEC-031 short-TTL for AJAX relays).
+ *                                  launch.php overrides to 300 to cover the
+ *                                  student's redirect to the backend.
+ * @param int|null $section_id      Optional Moodle section ID — surfaced as
+ *                                  the `section_id` claim for micro-survey
+ *                                  routing in the launch flow.
  * @return string Signed JWT string.
  */
-function local_srl_advisor_build_jwt($courseid, $pseudonymous_id, $api_token) {
+function local_srl_advisor_build_jwt(
+    $courseid,
+    $pseudonymous_id,
+    $api_token,
+    $ttl_seconds = 30,
+    $section_id = null
+) {
     global $CFG;
 
     $issued_at  = time();
-    // DEC-031 BLOCKER #4 (c): 30s TTL — halves the replay window. POSTs are
-    // also protected by Idempotency-Key + service-layer SELECT...FOR UPDATE.
-    $expires_at = $issued_at + 30;
+    $expires_at = $issued_at + (int)$ttl_seconds;
 
     $header  = rtrim(strtr(base64_encode(json_encode(['alg' => 'HS256', 'typ' => 'JWT'])), '+/', '-_'), '=');
     $payload = rtrim(strtr(base64_encode(json_encode([
         'iss'        => parse_url($CFG->wwwroot, PHP_URL_HOST),
         'sub'        => $pseudonymous_id,
         'course_id'  => $courseid,
-        'section_id' => null,
+        'section_id' => $section_id,
         'iat'        => $issued_at,
         'exp'        => $expires_at,
     ])), '+/', '-_'), '=');
