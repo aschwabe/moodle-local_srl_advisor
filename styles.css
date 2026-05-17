@@ -1,0 +1,96 @@
+/**
+ * SRL Advisor plugin styles.
+ *
+ * Moodle auto-loads styles.css at plugin root on every page where the plugin
+ * is active. Keep additions tightly scoped under the `.srladvisor-*` namespace
+ * so we never collide with Boost theme or other plugin selectors.
+ */
+
+/* --- Inline unit check-in panel (DEC-031 / DEC-048) --------------------- */
+
+.srladvisor-check-in {
+    background: #fff5f5;
+    border: 1px solid #f5c2c2;
+    border-left: 4px solid #d93545;
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    margin: 1rem 0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    font-size: 0.95rem;
+}
+
+.srladvisor-check-in__brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #d93545;
+    margin-bottom: 0.4rem;
+}
+
+.srladvisor-check-in__brand-dot {
+    display: inline-block;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    background: #d93545;
+}
+
+.srladvisor-check-in__heading {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 0 0 0.75rem 0;
+    color: #2b2b2b;
+}
+
+.srladvisor-check-in__select-label {
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.srladvisor-check-in__select {
+    width: 100%;
+    max-width: 32rem;
+}
+
+.srladvisor-check-in__description {
+    color: #555;
+    font-style: italic;
+    margin: 0.5rem 0 0.75rem 0;
+    min-height: 1.4rem;
+}
+
+.srladvisor-check-in__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.srladvisor-check-in__portal-link {
+    font-size: 0.85rem;
+    margin-left: auto;
+}
+
+.srladvisor-check-in__status {
+    color: #d93545;
+    font-size: 0.9rem;
+    margin: 0.5rem 0 0 0;
+    min-height: 1.2rem;
+}
+
+/* Screen-reader-only utility (when Boost theme's .sr-only isn't reachable). */
+.srladvisor-check-in .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}

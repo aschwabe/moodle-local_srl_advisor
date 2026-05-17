@@ -27,7 +27,7 @@ define([
 
     'use strict';
 
-    const MOUNT_ID = 'srladvisor-check-in-mount';
+    const MOUNT_ID_PREFIX = 'srladvisor-check-in-mount-';
     const PHASE_PRE = 'pre';
     const PHASE_POST = 'post';
 
@@ -61,15 +61,18 @@ define([
     }
 
     function ensureMount(phase) {
-        let mount = document.getElementById(MOUNT_ID);
+        const mountId = MOUNT_ID_PREFIX + phase;
+        let mount = document.getElementById(mountId);
         if (mount) {
             return mount;
         }
         mount = document.createElement('div');
-        mount.id = MOUNT_ID;
+        mount.id = mountId;
         // DEC-048: phase=pre mounts at TOP of #region-main (intent before
         // engagement); phase=post mounts at BOTTOM (reflection after
         // engagement). Falls back to body when #region-main is absent.
+        // Single-Page sections see init() called twice (pre + post); each
+        // call gets its own mount so both can coexist when needed.
         const host = document.getElementById('region-main') || document.body;
         if (phase === PHASE_PRE) {
             host.insertBefore(mount, host.firstChild);

@@ -51,15 +51,37 @@ $redirect_base = !empty($public_backend_url) ? $public_backend_url : $backend_ur
 // deterministic hash so the Python app can identify them without PII.
 $pseudonymous_id = hash('sha256', $USER->id . $CFG->siteidentifier);
 
+// DEC-048 follow-up: surface the section's human name so the backend can
+// stamp portal task labels with the unit name. Moodle stores the visible
+// section name in `course_sections.name`; if the operator left it blank,
+// fall back to "Topic N" using `sectionnum`. Either way the backend gets
+// something better than "Quick question about this section".
+$section_label = null;
+if (!empty($sectionid)) {
+    global $DB;
+    $section_row = $DB->get_record('course_sections', ['id' => $sectionid], 'name,section');
+    if ($section_row) {
+        $candidate = isset($section_row->name) ? trim((string)$section_row->name) : '';
+        if ($candidate === '') {
+            $candidate = isset($section_row->section)
+                ? get_string('section') . ' ' . (int)$section_row->section
+                : null;
+        }
+        $section_label = ($candidate !== '') ? $candidate : null;
+    }
+}
+
 // Delegate to the canonical plugin mint (DEC-043). 300s TTL covers the
-// student's redirect from Moodle → backend; section_id is optional for
-// the micro-survey routing path.
+// student's redirect from Moodle → backend; section_id + section_label are
+// optional, threaded through to drive micro-survey routing + portal task
+// labels respectively.
 $jwt = local_srl_advisor_build_jwt(
     $courseid,
     $pseudonymous_id,
     $api_token,
     300,
-    $sectionid
+    $sectionid,
+    $section_label
 );
 
 // --- Auto-submit POST form to Python backend ---

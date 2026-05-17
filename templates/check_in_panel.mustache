@@ -37,6 +37,9 @@
        data-task-id="{{task_id}}"
        data-is-pre="{{#is_pre}}1{{/is_pre}}{{^is_pre}}0{{/is_pre}}"
        data-idempotency-key="{{idempotency_key}}">
+    <div class="srladvisor-check-in__brand" aria-hidden="true">
+        <span class="srladvisor-check-in__brand-dot"></span>SRL Advisor
+    </div>
     <h3 class="srladvisor-check-in__heading">{{heading}}</h3>
     <form class="srladvisor-check-in__form" data-srladvisor-form>
         <label class="srladvisor-check-in__select-label" for="srladvisor-choice-{{task_id}}">

@@ -61,8 +61,29 @@ class get_pending_check_in extends external_api {
 
         require_once($CFG->dirroot . '/local/srl_advisor/lib.php');
 
+        // DEC-048 follow-up: look up the section's human name so the backend
+        // can stamp portal task labels with the unit name. Falls back to
+        // "Topic N" using `sectionnum` if the operator left `name` blank.
+        global $DB;
+        $section_label = null;
+        $section_row = $DB->get_record('course_sections', ['id' => $params['sectionid']], 'name,section');
+        if ($section_row) {
+            $candidate = isset($section_row->name) ? trim((string)$section_row->name) : '';
+            if ($candidate === '' && isset($section_row->section)) {
+                $candidate = get_string('section') . ' ' . (int)$section_row->section;
+            }
+            $section_label = ($candidate !== '') ? $candidate : null;
+        }
+
         $pseudo = hash('sha256', $USER->id . $CFG->siteidentifier);
-        $jwt = local_srl_advisor_build_jwt($params['courseid'], $pseudo, $api_token);
+        $jwt = local_srl_advisor_build_jwt(
+            $params['courseid'],
+            $pseudo,
+            $api_token,
+            30,
+            $params['sectionid'],
+            $section_label
+        );
         $path = '/api/v1/check-in?section_id=' . $params['sectionid'];
 
         $result = local_srl_advisor_relay_backend_call(

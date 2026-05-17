@@ -31,6 +31,11 @@ defined('MOODLE_INTERNAL') || die();
  * @param int|null $section_id      Optional Moodle section ID — surfaced as
  *                                  the `section_id` claim for micro-survey
  *                                  routing in the launch flow.
+ * @param string|null $section_label Optional human-readable Moodle section name
+ *                                  (`course_sections.name` or "Topic N" fallback)
+ *                                  — surfaced as the `section_label` claim so the
+ *                                  backend can stamp portal task labels with the
+ *                                  unit name (DEC-048 follow-up).
  * @return string Signed JWT string.
  */
 function local_srl_advisor_build_jwt(
@@ -38,22 +43,28 @@ function local_srl_advisor_build_jwt(
     $pseudonymous_id,
     $api_token,
     $ttl_seconds = 30,
-    $section_id = null
+    $section_id = null,
+    $section_label = null
 ) {
     global $CFG;
 
     $issued_at  = time();
     $expires_at = $issued_at + (int)$ttl_seconds;
 
-    $header  = rtrim(strtr(base64_encode(json_encode(['alg' => 'HS256', 'typ' => 'JWT'])), '+/', '-_'), '=');
-    $payload = rtrim(strtr(base64_encode(json_encode([
+    $claims = [
         'iss'        => parse_url($CFG->wwwroot, PHP_URL_HOST),
         'sub'        => $pseudonymous_id,
         'course_id'  => $courseid,
         'section_id' => $section_id,
         'iat'        => $issued_at,
         'exp'        => $expires_at,
-    ])), '+/', '-_'), '=');
+    ];
+    if (!empty($section_label)) {
+        $claims['section_label'] = (string)$section_label;
+    }
+
+    $header  = rtrim(strtr(base64_encode(json_encode(['alg' => 'HS256', 'typ' => 'JWT'])), '+/', '-_'), '=');
+    $payload = rtrim(strtr(base64_encode(json_encode($claims)), '+/', '-_'), '=');
 
     $signature = rtrim(strtr(base64_encode(hash_hmac('sha256', "$header.$payload", $api_token, true)), '+/', '-_'), '=');
 
@@ -372,36 +383,64 @@ function local_srl_advisor_before_footer() {
             $sectionid = (int)$cm->section;
 
             // DEC-048 (v1.1.1 UX patch): one pre per unit + one post per unit,
-            // section-scoped. Pre renders only on the section's first cm;
-            // post renders only on the section's last cm. Middle cms get no
-            // panel. Single-cm section emits pre only (no post, by design —
-            // a section with one page has no meaningful "after engagement"
-            // boundary distinct from the pre prompt).
+            // section-scoped. Pre on first Page-type cm in section; post on
+            // last Page-type cm. v1.1 is mod-page-view gated (DEC-031 Q1) so
+            // we MUST count Page-type cms only — a section ordered as
+            // [Page, Quiz, Assignment] would otherwise never emit post,
+            // because Assignment is the last cm but AMD never runs there.
+            //
+            // Single-Page section: the Page is both first and last; AMD
+            // renders pre (top) on initial visit and post (bottom) once the
+            // student has answered pre + the post-task gate fires.
             global $DB;
             $sequence = (string)$DB->get_field('course_sections', 'sequence', ['id' => $sectionid]);
-            $cm_ids = array_values(array_filter(array_map('intval', explode(',', $sequence))));
+            $cm_ids_raw = array_values(array_filter(array_map('intval', explode(',', $sequence))));
             $current_cmid = (int)$cm->id;
-            $is_first = !empty($cm_ids) && $cm_ids[0] === $current_cmid;
-            $is_last  = !empty($cm_ids) && end($cm_ids) === $current_cmid;
-            $is_single = count($cm_ids) === 1;
+            $page_module_id = (int)$DB->get_field('modules', 'id', ['name' => 'page']);
+            $page_cm_ids = [];
+            if (!empty($cm_ids_raw) && $page_module_id > 0) {
+                list($insql, $inparams) = $DB->get_in_or_equal($cm_ids_raw, SQL_PARAMS_NAMED);
+                $records = $DB->get_records_select(
+                    'course_modules',
+                    "id {$insql} AND module = :pageid",
+                    array_merge($inparams, ['pageid' => $page_module_id]),
+                    '',
+                    'id'
+                );
+                foreach ($cm_ids_raw as $cmid_in_seq) {
+                    if (isset($records[$cmid_in_seq])) {
+                        $page_cm_ids[] = $cmid_in_seq;
+                    }
+                }
+            }
+            $is_first_page = !empty($page_cm_ids) && $page_cm_ids[0] === $current_cmid;
+            $is_last_page  = !empty($page_cm_ids) && end($page_cm_ids) === $current_cmid;
 
-            $phase = null;
-            if ($is_single || $is_first) {
-                $phase = 'pre';
-            } elseif ($is_last) {
-                $phase = 'post';
+            // Pass BOTH phases when the page is simultaneously first and last
+            // (single-Page section). AMD's per-mount phase gate decides which
+            // panel to render based on the backend-returned task.is_pre.
+            $phases = [];
+            if ($is_first_page) {
+                $phases[] = 'pre';
+            }
+            if ($is_last_page && !$is_first_page) {
+                $phases[] = 'post';
+            } elseif ($is_first_page && $is_last_page) {
+                $phases[] = 'post';
             }
 
-            if ($phase === null) {
-                debugging("local_srl_advisor[inline_get]: skip — cmid={$current_cmid} is middle of section {$sectionid} (sequence=" . implode(',', $cm_ids) . ')', DEBUG_DEVELOPER);
+            if (empty($phases)) {
+                debugging("local_srl_advisor[inline_get]: skip — cmid={$current_cmid} is not a first/last Page in section {$sectionid} (page_cms=" . implode(',', $page_cm_ids) . ')', DEBUG_DEVELOPER);
             } else {
                 $portal_url = (new moodle_url('/local/srl_advisor/launch.php', ['courseid' => $courseid]))->out(false);
-                debugging("local_srl_advisor[inline_get]: injecting AMD (courseid={$courseid}, sectionid={$sectionid}, cmid={$current_cmid}, phase={$phase}, first={$is_first}, last={$is_last}, single={$is_single})", DEBUG_DEVELOPER);
-                $PAGE->requires->js_call_amd(
-                    'local_srl_advisor/check_in',
-                    'init',
-                    [$courseid, $sectionid, $portal_url, $phase]
-                );
+                debugging("local_srl_advisor[inline_get]: injecting AMD (courseid={$courseid}, sectionid={$sectionid}, cmid={$current_cmid}, phases=" . implode('+', $phases) . ", first_page={$is_first_page}, last_page={$is_last_page})", DEBUG_DEVELOPER);
+                foreach ($phases as $phase) {
+                    $PAGE->requires->js_call_amd(
+                        'local_srl_advisor/check_in',
+                        'init',
+                        [$courseid, $sectionid, $portal_url, $phase]
+                    );
+                }
             }
 
             // LAB-002 scroll telemetry — same mod-page gate. Backend ingest
