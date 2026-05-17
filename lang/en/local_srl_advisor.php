@@ -43,9 +43,12 @@ $string['inline_submit']                  = 'Save';
 $string['inline_dismiss']                 = 'Not now';
 $string['inline_thanks']                  = 'Thanks — your response was recorded.';
 $string['inline_error_generic']           = 'We could not save your response. Please try again or open the portal.';
-$string['inline_portal_fallback_link']    = 'Open SRL Advisor portal';
+$string['inline_portal_fallback_link']    = 'Read more about learning strategies on SRL Advisor';
 $string['inline_aria_panel']              = 'SRL Advisor check-in';
 $string['inline_placeholder']             = 'Pick one…';
+$string['inline_other_label']             = 'Tell us briefly which strategy you have in mind';
+$string['inline_other_placeholder']       = 'In your own words (max 200 chars)…';
+$string['inline_other_required']          = 'Please describe the strategy before saving.';
 
 // DEC-032 end-of-course summative survey banner.
 $string['summative_banner_heading'] = 'You\'ve finished the course!';

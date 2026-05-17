@@ -302,6 +302,90 @@ function local_srl_advisor_extend_navigation_course($navigation, $course, $conte
 }
 
 /**
+ * Moodle navbar-output callback — renders an SRL Advisor icon + pending-count
+ * pill in the top-right user-menu region, alongside Moodle's bell and chat
+ * icons. Same gates as the course-nav badge (enrolled in an allowlisted course
+ * + plugin configured + logged-in non-guest). 60s session cache prevents
+ * hammering the backend on every Moodle page render.
+ *
+ * Returns '' when any gate fails — Moodle simply omits the icon.
+ *
+ * @param renderer_base $renderer
+ * @return string HTML (link + badge) or '' when not applicable.
+ */
+function local_srl_advisor_render_navbar_output(\renderer_base $renderer): string {
+    global $USER, $CFG, $PAGE, $SESSION;
+
+    if (empty($PAGE) || !isloggedin() || isguestuser()) {
+        return '';
+    }
+
+    $course = $PAGE->course ?? null;
+    if (!$course || empty($course->id) || (int)$course->id === SITEID) {
+        // Top-right icon only shows inside a course context (matches the
+        // nav-badge gate). Site front-page / dashboard / admin pages omit.
+        return '';
+    }
+    $courseid = (int)$course->id;
+
+    $backend_url = trim((string)get_config('local_srl_advisor', 'backend_url'));
+    $api_token   = trim((string)get_config('local_srl_advisor', 'api_token'));
+    if (empty($backend_url) || empty($api_token)) {
+        return '';
+    }
+
+    $enabled_ids_raw = (string)get_config('local_srl_advisor', 'enabled_course_ids');
+    if ($enabled_ids_raw === '') {
+        return '';
+    }
+    $enabled_ids = array_map('trim', explode(',', $enabled_ids_raw));
+    if (!in_array((string)$courseid, $enabled_ids, true)) {
+        return '';
+    }
+
+    if (!is_enrolled(\context_course::instance($courseid), $USER, '', true)) {
+        return '';
+    }
+
+    // 60s per-(user, course) session cache. Keyed by courseid so the badge
+    // updates when the student switches courses without waiting out the
+    // window.
+    $cache_key = "srl_navbar_count_{$courseid}";
+    $cache_at_key = "srl_navbar_count_at_{$courseid}";
+    $now = time();
+    $cached = isset($SESSION->{$cache_key}) ? (int)$SESSION->{$cache_key} : null;
+    $cached_at = isset($SESSION->{$cache_at_key}) ? (int)$SESSION->{$cache_at_key} : 0;
+
+    if ($cached !== null && ($now - $cached_at) < 60) {
+        $pending_count = $cached;
+    } else {
+        $pseudonymous_id = hash('sha256', $USER->id . $CFG->siteidentifier);
+        $jwt = local_srl_advisor_build_jwt($courseid, $pseudonymous_id, $api_token);
+        $pending_count = (int)local_srl_advisor_get_pending_count($backend_url, $jwt);
+        $SESSION->{$cache_key} = $pending_count;
+        $SESSION->{$cache_at_key} = $now;
+    }
+
+    $launch_url = (new \moodle_url('/local/srl_advisor/launch.php', ['courseid' => $courseid]))->out(false);
+    $aria = get_string('nav_link', 'local_srl_advisor');
+    $badge_html = '';
+    if ($pending_count > 0) {
+        $badge_html = '<span class="badge bg-danger text-white rounded-pill srladvisor-navbar__badge">'
+            . (int)$pending_count
+            . '<span class="sr-only"> ' . s($aria) . '</span>'
+            . '</span>';
+    }
+
+    return '<div class="popover-region srladvisor-navbar">'
+        . '<a class="nav-link srladvisor-navbar__link" href="' . htmlspecialchars($launch_url) . '" '
+        . 'title="' . s($aria) . '" aria-label="' . s($aria) . '">'
+        . '<i class="icon fa fa-graduation-cap fa-fw" aria-hidden="true"></i>'
+        . $badge_html
+        . '</a>'
+        . '</div>';
+}
+
+/**
  * Renderer fired before the page footer. Invoked by the Moodle 4.5+ hook
  * listener in `classes/hook/before_footer.php`, which is registered in
  * `db/hooks.php` against `core\hook\output\before_footer_html_generation`.

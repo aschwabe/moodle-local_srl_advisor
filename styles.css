@@ -75,11 +75,65 @@
     margin-left: auto;
 }
 
+.srladvisor-check-in__other-label {
+    display: block;
+    margin: 0 0 0.5rem 0;
+}
+
+.srladvisor-check-in__other-label-text {
+    display: block;
+    font-size: 0.85rem;
+    color: #2b2b2b;
+    margin-bottom: 0.25rem;
+}
+
+.srladvisor-check-in__other-input {
+    width: 100%;
+    max-width: 32rem;
+}
+
 .srladvisor-check-in__status {
-    color: #d93545;
+    color: #6c757d;
     font-size: 0.9rem;
     margin: 0.5rem 0 0 0;
     min-height: 1.2rem;
+}
+
+.srladvisor-check-in__status--success {
+    color: #198754;
+    font-weight: 600;
+}
+
+.srladvisor-check-in__status--error {
+    color: #d93545;
+}
+
+/* --- Top-right navbar icon + badge --------------------------------------- */
+
+.srladvisor-navbar {
+    display: inline-block;
+    position: relative;
+}
+
+.srladvisor-navbar__link {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.5rem;
+    color: inherit;
+}
+
+.srladvisor-navbar__link .icon {
+    font-size: 1.1rem;
+    margin: 0;
+}
+
+.srladvisor-navbar__badge {
+    position: absolute;
+    top: -0.15rem;
+    right: -0.15rem;
+    font-size: 0.65rem;
+    padding: 0.15em 0.45em;
+    line-height: 1;
 }
 
 /* Screen-reader-only utility (when Boost theme's .sr-only isn't reachable). */

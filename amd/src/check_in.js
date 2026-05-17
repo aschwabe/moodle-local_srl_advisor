@@ -92,7 +92,10 @@ define([
             {key: 'inline_error_generic', component: 'local_srl_advisor'},
             {key: 'inline_portal_fallback_link', component: 'local_srl_advisor'},
             {key: 'inline_aria_panel', component: 'local_srl_advisor'},
-            {key: 'inline_placeholder', component: 'local_srl_advisor'}
+            {key: 'inline_placeholder', component: 'local_srl_advisor'},
+            {key: 'inline_other_label', component: 'local_srl_advisor'},
+            {key: 'inline_other_placeholder', component: 'local_srl_advisor'},
+            {key: 'inline_other_required', component: 'local_srl_advisor'}
         ]).then(function(s) {
             return {
                 question_pre: s[0],
@@ -103,7 +106,10 @@ define([
                 error_generic: s[5],
                 portal_fallback: s[6],
                 aria_panel: s[7],
-                placeholder: s[8]
+                placeholder: s[8],
+                other_label: s[9],
+                other_placeholder: s[10],
+                other_required: s[11]
             };
         });
     }
@@ -115,7 +121,7 @@ define([
         }])[0];
     }
 
-    function submit(courseid, taskid, strategyid, nostrategy, responseTimeMs, idemKey) {
+    function submit(courseid, taskid, strategyid, nostrategy, otherText, responseTimeMs, idemKey) {
         return Ajax.call([{
             methodname: 'local_srl_advisor_submit_check_in',
             args: {
@@ -123,6 +129,7 @@ define([
                 taskid: taskid,
                 strategyid: strategyid,
                 nostrategy: nostrategy,
+                othertext: otherText,
                 responsetimems: responseTimeMs,
                 idempotencykey: idemKey
             }
@@ -157,6 +164,8 @@ define([
             aria_label: strings.aria_panel,
             idempotency_key: uuidv4(),
             placeholder_label: strings.placeholder,
+            other_label: strings.other_label,
+            other_placeholder: strings.other_placeholder,
             options: task.options
         };
         return Templates.render('local_srl_advisor/check_in_panel', ctx).then(function(html) {
@@ -170,21 +179,41 @@ define([
         const $form = $panel.find('[data-srladvisor-form]');
         const $select = $panel.find('[data-srladvisor-select]');
         const $description = $panel.find('[data-srladvisor-description]');
+        const $otherWrap = $panel.find('[data-srladvisor-other-wrap]');
+        const $otherInput = $panel.find('[data-srladvisor-other-input]');
         const $submit = $panel.find('[data-srladvisor-submit]');
         const $dismiss = $panel.find('[data-srladvisor-dismiss]');
         const $status = $panel.find('[data-srladvisor-status]');
         const renderedAt = Date.now();
 
+        function clearStatus() {
+            $status.text('').removeClass('srladvisor-check-in__status--success srladvisor-check-in__status--error');
+        }
+
         // DEC-048: keep submit disabled until the student picks a non-placeholder
         // option. Description block mirrors the selected option's data-description.
+        // DEC-048 follow-up: when 'Other' selected, reveal text input + require
+        // non-empty value to enable Save.
         function syncSelection() {
             const $opt = $select.find('option:selected');
             const value = $select.val();
             const desc = $opt.attr('data-description') || '';
+            const isOther = $opt.attr('data-other') === '1';
             $description.text(desc);
-            $submit.prop('disabled', !value);
+            if (isOther) {
+                $otherWrap.removeAttr('hidden');
+                const otherFilled = $.trim($otherInput.val() || '').length > 0;
+                $submit.prop('disabled', !otherFilled);
+            } else {
+                $otherWrap.attr('hidden', 'hidden');
+                $submit.prop('disabled', !value);
+            }
         }
-        $select.on('change', syncSelection);
+        $select.on('change', function() {
+            clearStatus();
+            syncSelection();
+        });
+        $otherInput.on('input', syncSelection);
 
         // DEC-048: for post tasks, pre-select the strategy the student picked at
         // pre time so the dropdown reads "you said X — was it?". previous_strategy_id
@@ -203,24 +232,40 @@ define([
             }
             const strategyId = parseInt($opt.attr('data-strategy-id'), 10) || 0;
             const noStrategy = $opt.attr('data-no-strategy') === '1';
+            const isOther = $opt.attr('data-other') === '1';
+            const otherText = isOther ? $.trim($otherInput.val() || '') : '';
+            if (isOther && otherText === '') {
+                $status.text(strings.other_required)
+                    .removeClass('srladvisor-check-in__status--success')
+                    .addClass('srladvisor-check-in__status--error');
+                $otherInput.trigger('focus');
+                return;
+            }
             const responseTimeMs = Date.now() - renderedAt;
             const idemKey = $panel.attr('data-idempotency-key');
 
             $submit.prop('disabled', true);
             $dismiss.prop('disabled', true);
 
-            submit(courseid, task.task_id, strategyId, noStrategy, responseTimeMs, idemKey).then(function(res) {
+            submit(courseid, task.task_id, strategyId, noStrategy, otherText, responseTimeMs, idemKey).then(function(res) {
                 if (res.ok) {
-                    $status.text(strings.thanks);
+                    $status.text(strings.thanks)
+                        .removeClass('srladvisor-check-in__status--error')
+                        .addClass('srladvisor-check-in__status--success');
                     $select.prop('disabled', true);
+                    $otherInput.prop('disabled', true);
                     return;
                 }
-                $status.text(strings.error_generic);
+                $status.text(strings.error_generic)
+                    .removeClass('srladvisor-check-in__status--success')
+                    .addClass('srladvisor-check-in__status--error');
                 $submit.prop('disabled', false);
                 $dismiss.prop('disabled', false);
                 return;
             }).fail(function(err) {
-                $status.text(strings.error_generic);
+                $status.text(strings.error_generic)
+                    .removeClass('srladvisor-check-in__status--success')
+                    .addClass('srladvisor-check-in__status--error');
                 $submit.prop('disabled', false);
                 $dismiss.prop('disabled', false);
                 Notification.exception(err);

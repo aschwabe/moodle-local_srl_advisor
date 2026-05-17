@@ -54,19 +54,32 @@
                     {{#strategy_id}}
                         <option value="strategy:{{strategy_id}}"
                                 data-strategy-id="{{strategy_id}}"
+                                data-kind="strategy"
                                 data-no-strategy="0"
+                                data-other="0"
                                 data-description="{{description}}">{{name}}</option>
                     {{/strategy_id}}
                     {{^strategy_id}}
-                        <option value="no_strategy"
+                        <option value="{{kind}}"
                                 data-strategy-id="0"
-                                data-no-strategy="1"
+                                data-kind="{{kind}}"
+                                data-no-strategy="{{#is_no_strategy}}1{{/is_no_strategy}}{{^is_no_strategy}}0{{/is_no_strategy}}"
+                                data-other="{{#is_other}}1{{/is_other}}{{^is_other}}0{{/is_other}}"
                                 data-description="">{{label}}</option>
                     {{/strategy_id}}
                 {{/options}}
             </select>
         </label>
         <p class="srladvisor-check-in__description" data-srladvisor-description aria-live="polite"></p>
+        <label class="srladvisor-check-in__other-label" data-srladvisor-other-wrap hidden>
+            <span class="srladvisor-check-in__other-label-text">{{other_label}}</span>
+            <input type="text"
+                   class="form-control srladvisor-check-in__other-input"
+                   data-srladvisor-other-input
+                   maxlength="200"
+                   placeholder="{{other_placeholder}}"
+                   autocomplete="off">
+        </label>
         <div class="srladvisor-check-in__actions">
             <button type="submit" class="btn btn-primary" data-srladvisor-submit disabled>{{submit_label}}</button>
             <button type="button" class="btn btn-secondary" data-srladvisor-dismiss>{{dismiss_label}}</button>

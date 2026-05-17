@@ -101,12 +101,15 @@ class get_pending_check_in extends external_api {
         $task = $data['task'];
         $options = [];
         foreach (($task['options'] ?? []) as $opt) {
+            $kind = (string)($opt['kind'] ?? '');
             $options[] = [
-                'kind'         => (string)($opt['kind'] ?? ''),
-                'strategy_id'  => isset($opt['strategy_id']) ? (int)$opt['strategy_id'] : 0,
-                'name'         => (string)($opt['name'] ?? ''),
-                'description'  => (string)($opt['description'] ?? ''),
-                'label'        => (string)($opt['label'] ?? ''),
+                'kind'            => $kind,
+                'strategy_id'     => isset($opt['strategy_id']) ? (int)$opt['strategy_id'] : 0,
+                'name'            => (string)($opt['name'] ?? ''),
+                'description'     => (string)($opt['description'] ?? ''),
+                'label'           => (string)($opt['label'] ?? ''),
+                'is_no_strategy'  => ($kind === 'no_strategy'),
+                'is_other'        => ($kind === 'other'),
             ];
         }
 

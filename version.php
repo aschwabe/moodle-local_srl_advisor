@@ -9,7 +9,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026051707;   // Migrate before_footer to Moodle 4.5 hook API (db/hooks.php + classes/hook/before_footer.php); kills deprecation notice.
+$plugin->version   = 2026051708;   // DEC-048 follow-up: 'Other' option + portal copy + green success + top-right navbar badge.
 $plugin->requires  = 2024100700;   // Requires Moodle 4.5+ (DEC-031).
 $plugin->component = 'local_srl_advisor';
 $plugin->maturity  = MATURITY_ALPHA;
