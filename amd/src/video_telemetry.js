@@ -3,8 +3,11 @@
  * Video-event telemetry (LAB-003 MVP, DEC-019/DEC-035/DEC-036).
  *
  * Observes HTML5 <video> elements + YouTube iframe embeds + Vimeo iframe
- * embeds on `mod-page-view`. Emits behavior events to the backend L1 event
- * log via the plugin's relay (same path as scroll telemetry).
+ * embeds + Panopto iframe embeds on `mod-page-view`. Emits behavior events
+ * to the backend L1 event log via the plugin's relay (same path as scroll
+ * telemetry). Panopto is the production player at St Andrews; its
+ * EmbedApi.js is served per-tenant, so the loader derives the tenant from
+ * the iframe's src origin.
  *
  * Verb subset (DEC-019 §Piece 1):
  *   video.played       — playback started or resumed.
@@ -273,7 +276,108 @@ define([
                     });
                 }
 
-                if (html5.length === 0 && ytIframes.length === 0 && vimeoIframes.length === 0) {
+                // -------- Panopto iframes --------
+                // Panopto serves EmbedApi.js per-tenant (no central CDN); derive the
+                // tenant origin from each iframe's src. Iframe must have an `id`
+                // attribute — EmbedApi looks the element up by id.
+                const panoptoIframes = Array.prototype.slice.call(
+                    document.querySelectorAll('iframe[src*="/Panopto/Pages/Embed.aspx"]')
+                );
+                if (panoptoIframes.length > 0) {
+                    const tenantsLoaded = {};
+                    panoptoIframes.forEach(function(iframe) {
+                        if (!iframe.id) {
+                            // Synthesize an id so EmbedApi can find the iframe.
+                            iframe.id = 'srl-panopto-' + Math.random().toString(36).slice(2, 10);
+                        }
+                        let tenantOrigin;
+                        try {
+                            tenantOrigin = new URL(iframe.src).origin;
+                        } catch (e) {
+                            if (window.console && console.warn) {
+                                console.warn('local_srl_advisor[video]: Panopto iframe src unparseable', e);
+                            }
+                            return;
+                        }
+                        const apiSrc = tenantOrigin + '/Panopto/Resources/Embed/EmbedApi.js';
+                        if (!tenantsLoaded[tenantOrigin]) {
+                            tenantsLoaded[tenantOrigin] = loadScriptOnce(apiSrc);
+                        }
+                        tenantsLoaded[tenantOrigin].then(function() {
+                            if (!window.EmbedApi) {
+                                if (window.console && console.warn) {
+                                    console.warn('local_srl_advisor[video]: Panopto EmbedApi not on window after load');
+                                }
+                                return;
+                            }
+                            const idx = videoIndex++;
+                            // State enum per Panopto EmbedApi docs:
+                            //   0=Unstarted, 1=Playing, 2=Paused, 3=Buffering, 4=Ended.
+                            // Panopto exposes no dedicated seek event; reuse the
+                            // YouTube heartbeat-vs-buffering heuristic.
+                            let expectedPosition = 0;
+                            let durationSec = 0;
+                            let heartbeat = null;
+                            let player = null;
+                            const readCurrentTime = function(cb) {
+                                // EmbedApi.getCurrentTime is callback-style; some
+                                // tenant versions return a value directly. Handle both.
+                                try {
+                                    const ret = player.getCurrentTime(function(t) { cb(t); });
+                                    if (typeof ret === 'number') { cb(ret); }
+                                } catch (e) { cb(expectedPosition); }
+                            };
+                            /* global EmbedApi */
+                            player = new EmbedApi(iframe.id, {
+                                videoParams: {interactivity: 'all'},
+                                events: {
+                                    onReady: function() {
+                                        try {
+                                            player.getDuration(function(d) { durationSec = Math.round(d || 0); });
+                                        } catch (e) { /* tenant variant — duration filled later */ }
+                                    },
+                                    onStateChange: function(state) {
+                                        readCurrentTime(function(t) {
+                                            const ts = Math.round(t || 0);
+                                            if (state === 1) {
+                                                emit('video.played', idx, {position_s: ts, duration_s: durationSec});
+                                                if (!heartbeat) {
+                                                    heartbeat = window.setInterval(function() {
+                                                        readCurrentTime(function(p) {
+                                                            expectedPosition = Math.round(p || 0);
+                                                        });
+                                                    }, 1000);
+                                                }
+                                            } else if (state === 2) {
+                                                emit('video.paused', idx, {position_s: ts});
+                                            } else if (state === 4) {
+                                                if (heartbeat) { window.clearInterval(heartbeat); heartbeat = null; }
+                                                const pct = durationSec > 0
+                                                    ? Math.round((ts / durationSec) * 100)
+                                                    : 100;
+                                                emit('video.ended', idx, {watch_pct: pct}, sessionId + ':panopto:' + idx + ':end');
+                                            } else if (state === 3) {
+                                                if (Math.abs(ts - expectedPosition) > 2 && expectedPosition > 0) {
+                                                    emit('video.seeked', idx, {from_s: expectedPosition, to_s: ts});
+                                                    expectedPosition = ts;
+                                                }
+                                            }
+                                        });
+                                    },
+                                    onPlaybackRateChange: function(rate) {
+                                        emit('video.rate_changed', idx, {playback_rate: rate});
+                                    }
+                                }
+                            });
+                        }).catch(function(e) {
+                            if (window.console && console.warn) {
+                                console.warn('local_srl_advisor[video]: Panopto EmbedApi load failed', e);
+                            }
+                        });
+                    });
+                }
+
+                if (html5.length === 0 && ytIframes.length === 0 && vimeoIframes.length === 0 && panoptoIframes.length === 0) {
                     // No video surfaces on this page — no need to start a flush timer.
                     return null;
                 }
