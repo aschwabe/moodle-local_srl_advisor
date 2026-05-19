@@ -531,12 +531,12 @@ function local_srl_advisor_render_before_footer() {
                 $PAGE->requires->js_call_amd(
                     'local_srl_advisor/scroll_telemetry',
                     'init',
-                    [$courseid, $sectionid, $pagetype]
+                    [$courseid, $sectionid, $pagetype, $current_cmid]
                 );
                 $PAGE->requires->js_call_amd(
                     'local_srl_advisor/video_telemetry',
                     'init',
-                    [$courseid, $sectionid, $pagetype]
+                    [$courseid, $sectionid, $pagetype, $current_cmid]
                 );
             }
         }

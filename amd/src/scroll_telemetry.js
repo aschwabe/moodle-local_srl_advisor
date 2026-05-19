@@ -78,8 +78,9 @@ define([
          * @param {Number} courseid    Moodle course id (unused client-side; backend resolves from JWT).
          * @param {Number} sectionid   Moodle course_sections.id (passed in payload as page_type context).
          * @param {String} pageType    Moodle $PAGE->pagetype (e.g., 'mod-page-view').
+         * @param {Number} cmid        Moodle course_modules.id of the current page (stamped on every event).
          */
-        init: function(courseid, sectionid, pageType) {
+        init: function(courseid, sectionid, pageType, cmid) {
             try {
                 const sessionId = uuidv4();
                 const sessionStartMs = Date.now();
@@ -95,7 +96,7 @@ define([
                     verb: 'scroll.session_started',
                     occurred_at: nowIso(),
                     session_id: sessionId,
-                    moodle_cm_id: null,
+                    moodle_cm_id: cmid || null,
                     correlation_id: null,
                     idempotency_key: sessionId + ':start',
                     payload_schema_version: '1.0',
@@ -138,7 +139,7 @@ define([
                             verb: 'scroll.back',
                             occurred_at: nowIso(),
                             session_id: sessionId,
-                            moodle_cm_id: null,
+                            moodle_cm_id: cmid || null,
                             correlation_id: null,
                             idempotency_key: null,
                             payload_schema_version: '1.0',
@@ -159,7 +160,7 @@ define([
                         verb: 'scroll.session_ended',
                         occurred_at: nowIso(),
                         session_id: sessionId,
-                        moodle_cm_id: null,
+                        moodle_cm_id: cmid || null,
                         correlation_id: null,
                         idempotency_key: sessionId + ':end',
                         payload_schema_version: '1.0',
