@@ -9,7 +9,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026051910;   // DEC-053 Panopto provider in video_telemetry + cm_id stamping fix on scroll/video + navbar badge CSS tune.
+$plugin->version   = 2026051911;   // Navbar badge icon-wrap restructure + Other-input is_other Mustache flag (DEC-053 amend + DEC-048 follow-up bug).
 $plugin->requires  = 2024100700;   // Requires Moodle 4.5+ (DEC-031).
 $plugin->component = 'local_srl_advisor';
 $plugin->maturity  = MATURITY_ALPHA;

@@ -390,8 +390,10 @@ function local_srl_advisor_render_navbar_output(\renderer_base $renderer): strin
         . 'aria-label="' . s($tooltip) . '" '
         . 'data-toggle="tooltip" data-bs-toggle="tooltip" '
         . 'data-placement="bottom" data-bs-placement="bottom">'
+        . '<span class="srladvisor-navbar__icon-wrap">'
         . '<i class="icon fa fa-graduation-cap fa-fw" aria-hidden="true"></i>'
         . $badge_html
+        . '</span>'
         . '</a></div>';
 }
 

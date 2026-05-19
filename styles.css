@@ -117,9 +117,10 @@
 
 .srladvisor-navbar__link {
     position: relative;
-    display: inline-flex;
+    display: inline-flex !important;
     align-items: center;
-    padding: 0.25rem 0.5rem;
+    padding: 0.25rem 0.5rem !important;
+    line-height: 1 !important;
     color: inherit;
 }
 
@@ -128,10 +129,16 @@
     margin: 0;
 }
 
+.srladvisor-navbar__icon-wrap {
+    position: relative;
+    display: inline-block;
+    line-height: 1;
+}
+
 .srladvisor-navbar__badge {
     position: absolute;
-    top: -0.15rem;
-    right: -0.15rem;
+    top: -0.4rem;
+    right: -0.5rem;
     font-size: 0.65rem;
     padding: 0.15em 0.45em;
     line-height: 1;
