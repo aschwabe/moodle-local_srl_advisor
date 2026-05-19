@@ -9,7 +9,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026051710;   // Widen inline AMD gate to mod-assign-view + mod-quiz-view; post check-in now fires on section's last cm (Reflection).
+$plugin->version   = 2026051910;   // DEC-053 Panopto provider in video_telemetry + cm_id stamping fix on scroll/video + navbar badge CSS tune.
 $plugin->requires  = 2024100700;   // Requires Moodle 4.5+ (DEC-031).
 $plugin->component = 'local_srl_advisor';
 $plugin->maturity  = MATURITY_ALPHA;

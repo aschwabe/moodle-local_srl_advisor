@@ -392,8 +392,7 @@ function local_srl_advisor_render_navbar_output(\renderer_base $renderer): strin
         . 'data-placement="bottom" data-bs-placement="bottom">'
         . '<i class="icon fa fa-graduation-cap fa-fw" aria-hidden="true"></i>'
         . $badge_html
-        . '</a>'
-        . '</div>';
+        . '</a></div>';
 }
 
 /**
