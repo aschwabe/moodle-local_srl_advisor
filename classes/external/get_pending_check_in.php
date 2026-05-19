@@ -150,11 +150,13 @@ class get_pending_check_in extends external_api {
             'section_id'           => new external_value(PARAM_INT, 'Moodle section id this task is scoped to'),
             'options'              => new external_multiple_structure(
                 new external_single_structure([
-                    'kind'         => new external_value(PARAM_TEXT, 'strategy | no_strategy'),
-                    'strategy_id'  => new external_value(PARAM_INT, '0 when kind=no_strategy'),
-                    'name'         => new external_value(PARAM_TEXT, 'Strategy name (kind=strategy)'),
-                    'description'  => new external_value(PARAM_TEXT, 'Student-facing description (kind=strategy)'),
-                    'label'        => new external_value(PARAM_TEXT, 'No-strategy label (kind=no_strategy)'),
+                    'kind'            => new external_value(PARAM_TEXT, 'strategy | no_strategy | other'),
+                    'strategy_id'     => new external_value(PARAM_INT, '0 when kind=no_strategy or kind=other'),
+                    'name'            => new external_value(PARAM_TEXT, 'Strategy name (kind=strategy)'),
+                    'description'     => new external_value(PARAM_TEXT, 'Student-facing description (kind=strategy)'),
+                    'label'           => new external_value(PARAM_TEXT, 'No-strategy/Other label (kind=no_strategy|other)'),
+                    'is_no_strategy'  => new external_value(PARAM_BOOL, 'True when kind=no_strategy; drives the Mustache branch'),
+                    'is_other'        => new external_value(PARAM_BOOL, 'True when kind=other; drives the Mustache branch + AMD text-input reveal'),
                 ])
             ),
             'previous_strategy_id' => new external_value(PARAM_INT, 'Strategy_id from this participant\'s pre answer in the same section (0 = none / no_strategy)'),
