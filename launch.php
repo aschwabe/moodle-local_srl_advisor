@@ -30,6 +30,16 @@ $course    = get_course($courseid);
 $context = context_course::instance($courseid);
 require_capability('mod/assign:view', $context); // Must be enrolled.
 
+// DEC-059: invalidate the navbar pending-count session cache before the launch
+// redirect. A student arriving at launch.php is in the middle of (or just
+// after) an action — the cached count is about to be wrong. Clearing here
+// guarantees the badge refetches fresh on the next Moodle page render after
+// the student returns from the portal.
+global $SESSION;
+$srl_cache_key    = "srl_navbar_count_{$courseid}";
+$srl_cache_at_key = "srl_navbar_count_at_{$courseid}";
+unset($SESSION->{$srl_cache_key}, $SESSION->{$srl_cache_at_key});
+
 // --- Retrieve plugin configuration ---
 $backend_url        = rtrim(trim(get_config('local_srl_advisor', 'backend_url')), '/');
 $public_backend_url = rtrim(trim(get_config('local_srl_advisor', 'public_backend_url')), '/');

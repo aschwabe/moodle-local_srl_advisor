@@ -347,16 +347,20 @@ function local_srl_advisor_render_navbar_output(\renderer_base $renderer): strin
         return '';
     }
 
-    // 60s per-(user, course) session cache. Keyed by courseid so the badge
-    // updates when the student switches courses without waiting out the
-    // window.
+    // 5s per-(user, course) session cache (DEC-059, was 60s). Keyed by courseid
+    // so the badge updates when the student switches courses without waiting
+    // out the window. 60s was too stale — after completing a task, the badge
+    // sat at the old count for up to a minute before refreshing, looking like
+    // a bug to the student. 5s is short enough that completion → next page
+    // render shows the correct count, while still throttling the rapid-fire
+    // case of a student scrolling through many course pages.
     $cache_key = "srl_navbar_count_{$courseid}";
     $cache_at_key = "srl_navbar_count_at_{$courseid}";
     $now = time();
     $cached = isset($SESSION->{$cache_key}) ? (int)$SESSION->{$cache_key} : null;
     $cached_at = isset($SESSION->{$cache_at_key}) ? (int)$SESSION->{$cache_at_key} : 0;
 
-    if ($cached !== null && ($now - $cached_at) < 60) {
+    if ($cached !== null && ($now - $cached_at) < 5) {
         $pending_count = $cached;
     } else {
         $pseudonymous_id = hash('sha256', $USER->id . $CFG->siteidentifier);
@@ -523,11 +527,11 @@ function local_srl_advisor_render_before_footer() {
                 }
             }
 
-            // LAB-002 scroll + LAB-003 video telemetry — Page-view only. Quiz
-            // and Assignment pages have their own content models (interactive
-            // forms, submission UIs) where scroll-depth and embedded-video
-            // signals don't map to the reading-engagement question these labs
-            // measure. Keep the original mod-page-view gate.
+            // LAB-002 scroll + LAB-003 video + LAB-004 download + LAB-005
+            // clipboard telemetry — Page-view only. Quiz and Assignment pages
+            // have their own content models (interactive forms, submission UIs)
+            // where reading-engagement signals don't map to the question these
+            // labs measure. Keep the original mod-page-view gate.
             if ($is_mod_page) {
                 $PAGE->requires->js_call_amd(
                     'local_srl_advisor/scroll_telemetry',
@@ -539,8 +543,32 @@ function local_srl_advisor_render_before_footer() {
                     'init',
                     [$courseid, $sectionid, $pagetype, $current_cmid]
                 );
+                $PAGE->requires->js_call_amd(
+                    'local_srl_advisor/download_telemetry',
+                    'init',
+                    [$courseid, $sectionid, $pagetype, $current_cmid]
+                );
+                $PAGE->requires->js_call_amd(
+                    'local_srl_advisor/clipboard_telemetry',
+                    'init',
+                    [$courseid, $sectionid, $pagetype, $current_cmid]
+                );
             }
         }
+    }
+
+    // --- LAB-004 download telemetry on course-view-* (DEC-057) ----------
+    // Section/course homepage is where students click mod-resource activity
+    // links (PDF, slides, docx) — Moodle resolves these to the actual file
+    // via /mod/resource/view.php. Mount the download module here so those
+    // clicks are captured even when the student never opens a Page.
+    // sectionid + cmid are null on course-view; AMD accepts null gracefully.
+    if ($is_course && !$is_mod_activity) {
+        $PAGE->requires->js_call_amd(
+            'local_srl_advisor/download_telemetry',
+            'init',
+            [$courseid, null, $pagetype, null]
+        );
     }
 
     // --- DEC-032 end-of-course summative banner -------------------------
