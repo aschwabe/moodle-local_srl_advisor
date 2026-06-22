@@ -28,7 +28,7 @@ $course    = get_course($courseid);
 
 // Set up the Moodle page context.
 $context = context_course::instance($courseid);
-require_capability('mod/assign:view', $context); // Must be enrolled.
+require_capability('local/srl_advisor:participate', $context); // DEC-062: was mod/assign:view proxy.
 
 // DEC-059: invalidate the navbar pending-count session cache before the launch
 // redirect. A student arriving at launch.php is in the middle of (or just

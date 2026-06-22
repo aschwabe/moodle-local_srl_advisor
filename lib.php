@@ -343,7 +343,7 @@ function local_srl_advisor_render_navbar_output(\renderer_base $renderer): strin
         return '';
     }
 
-    if (!is_enrolled(\context_course::instance($courseid), $USER, '', true)) {
+    if (!has_capability('local/srl_advisor:participate', \context_course::instance($courseid), $USER)) {
         return '';
     }
 
@@ -474,9 +474,9 @@ function local_srl_advisor_render_before_footer() {
         return;
     }
 
-    // Enrolment gate (BLOCKER #2) — same posture as nav-badge.
+    // Capability gate (DEC-062, supersedes BLOCKER #2 enrolment gate) — same posture as nav-badge.
     $context = context_course::instance($courseid);
-    if (!is_enrolled($context, $USER, '', true)) {
+    if (!has_capability('local/srl_advisor:participate', $context, $USER)) {
         return;
     }
 

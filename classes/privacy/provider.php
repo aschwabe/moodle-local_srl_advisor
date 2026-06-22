@@ -1,12 +1,18 @@
 <?php
 /**
- * Privacy API provider for the SRL Advisor local plugin (DEC-017).
+ * Privacy API provider for the SRL Advisor local plugin (DEC-017, amended DEC-062).
  *
- * The plugin stores no personal data in the Moodle database. It computes
- * ephemeral SHA-256 hashes of user ids at request time (launch flow + sync
- * web service) and forwards them to the SRL Advisor backend. Raw Moodle
- * user ids are sent as transient API parameters and never persisted by
- * SRL Advisor. null_provider is the correct declaration.
+ * The plugin stores NO personal data in the Moodle database. However, it
+ * transmits user-related data to an EXTERNAL service (the SRL Advisor backend):
+ * a salted SHA-256 hash of the Moodle user id, the course id, behavioural
+ * telemetry events, and learning-strategy / reflection responses. Moodle's
+ * Privacy API requires that any plugin sending data to an external location
+ * declare a metadata provider with add_external_location_link() — null_provider
+ * is ONLY valid when the plugin neither stores nor transmits personal data.
+ *
+ * Grounded against https://moodledev.io/docs/4.5/apis/subsystems/privacy
+ * ("Many plugins will interact with external systems ... use
+ * add_external_location_link()"). See L032 (no-assumptions rule).
  *
  * @package    local_srl_advisor
  * @copyright  2026 Andrew Schwabe
@@ -15,12 +21,29 @@
 
 namespace local_srl_advisor\privacy;
 
+use core_privacy\local\metadata\collection;
+
 defined('MOODLE_INTERNAL') || die();
 
-use core_privacy\local\metadata\null_provider;
+class provider implements \core_privacy\local\metadata\provider {
 
-class provider implements null_provider {
-    public static function get_reason(): string {
-        return 'privacy:metadata';
+    /**
+     * Describe the user data transmitted to the external SRL Advisor backend.
+     *
+     * @param collection $collection the metadata collection to add to.
+     * @return collection the updated collection.
+     */
+    public static function get_metadata(collection $collection): collection {
+        $collection->add_external_location_link(
+            'srl_advisor_backend',
+            [
+                'useridhash'     => 'privacy:metadata:srl_advisor_backend:useridhash',
+                'courseid'       => 'privacy:metadata:srl_advisor_backend:courseid',
+                'behaviorevents' => 'privacy:metadata:srl_advisor_backend:behaviorevents',
+                'strategychoice' => 'privacy:metadata:srl_advisor_backend:strategychoice',
+            ],
+            'privacy:metadata:srl_advisor_backend'
+        );
+        return $collection;
     }
 }

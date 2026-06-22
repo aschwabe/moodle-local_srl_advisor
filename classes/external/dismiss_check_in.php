@@ -56,7 +56,7 @@ class dismiss_check_in extends external_api {
         $context = context_course::instance($params['courseid']);
         self::validate_context($context);
 
-        if (!is_enrolled($context, $USER, '', true)) {
+        if (!has_capability('local/srl_advisor:participate', $context, $USER)) {
             return ['ok' => false, 'error' => 'not_enrolled', 'count' => 0, 'suppressed_until' => ''];
         }
 

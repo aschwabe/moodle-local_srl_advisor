@@ -27,8 +27,17 @@ $string['settings_enabled_course_ids_desc'] = 'A comma-separated list of Moodle 
 $string['settings_insecure_ssl']           = 'Allow insecure SSL (dev only)';
 $string['settings_insecure_ssl_desc']      = 'Disable peer and host SSL verification on the action-items API call. Use only when pointing at a dev backend with a self-signed certificate. Leave off in production.';
 
-// Privacy API (null_provider — DEC-017).
-$string['privacy:metadata'] = 'The SRL Advisor plugin does not store any personal data in Moodle. It computes ephemeral SHA-256 hashes of user IDs (using the site identifier as a salt) and forwards them to the SRL Advisor backend for the launch flow and for consent-gated data sync. Real Moodle user IDs are sent to the backend only as transient API parameters and are never persisted there.';
+// Privacy API (external-location provider — DEC-017, amended DEC-062).
+// The plugin stores no personal data in Moodle but transmits the data below to
+// the external SRL Advisor backend, so the Privacy API requires these strings.
+$string['privacy:metadata:srl_advisor_backend'] = 'To deliver self-regulated-learning support, the plugin sends a limited set of pseudonymised data to the SRL Advisor backend service. No directly identifying personal data (name, email) is ever transmitted.';
+$string['privacy:metadata:srl_advisor_backend:useridhash'] = 'A salted SHA-256 hash of your Moodle user ID, used so the backend can recognise your activity across sessions without storing your real identity.';
+$string['privacy:metadata:srl_advisor_backend:courseid'] = 'The Moodle course ID, used to scope your learning data and action items to the correct course.';
+$string['privacy:metadata:srl_advisor_backend:behaviorevents'] = 'Behavioural telemetry within course activities (e.g. page scroll, video, clipboard and resource-download events) used to surface learning-strategy prompts.';
+$string['privacy:metadata:srl_advisor_backend:strategychoice'] = 'Your learning-strategy selections and short free-text reflections submitted in pre/post check-ins.';
+
+// Capability (DEC-062 — supersedes DEC-047/049 deferral).
+$string['srl_advisor:participate'] = 'Participate in SRL Advisor learning-strategy check-ins and view personalised action items';
 
 // Web service (DEC-017).
 $string['srladvisor_sync_service'] = 'SRL Advisor Sync';

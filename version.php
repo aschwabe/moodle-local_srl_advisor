@@ -9,8 +9,8 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026052602;   // DEC-057 fix: download_telemetry file_type='resource' sentinel for /mod/resource/view.php URLs (was misreading 'php' from Moodle's redirect URL).
+$plugin->version   = 2026062200;   // DEC-062: db/access.php capability + external-location Privacy API; is_enrolled→has_capability swap.
 $plugin->requires  = 2024100700;   // Requires Moodle 4.5+ (DEC-031).
 $plugin->component = 'local_srl_advisor';
 $plugin->maturity  = MATURITY_ALPHA;
-$plugin->release   = 'v0.4.0-alpha';
+$plugin->release   = 'v0.5.0-alpha';

@@ -105,4 +105,33 @@ class local_srl_advisor_check_in_inline_smoke_test extends advanced_testcase {
         $this->expectException(require_login_exception::class);
         \local_srl_advisor\external\get_pending_check_in::execute(1, 1);
     }
+
+    /**
+     * DEC-062: db/access.php wiring. Verifies the participate capability is
+     * granted to enrolled students by archetype, denied to outsiders, and can
+     * be granted to a NON-enrolled user (researcher/auditor) without enrolling
+     * them — the use case that drove the capability off the DEC-047/049 deferral.
+     */
+    public function test_participate_capability_gate() {
+        $this->resetAfterTest();
+        $course  = $this->getDataGenerator()->create_course();
+        $context = context_course::instance($course->id);
+
+        // Enrolled student gets the cap via the student archetype.
+        $student = $this->getDataGenerator()->create_user();
+        $this->getDataGenerator()->enrol_user($student->id, $course->id, 'student');
+        $this->assertTrue(has_capability('local/srl_advisor:participate', $context, $student));
+
+        // A user with no role in the course does not.
+        $outsider = $this->getDataGenerator()->create_user();
+        $this->assertFalse(has_capability('local/srl_advisor:participate', $context, $outsider));
+
+        // A non-enrolled user granted the cap via an explicit role assignment does.
+        $researcher = $this->getDataGenerator()->create_user();
+        $roleid = $this->getDataGenerator()->create_role();
+        assign_capability('local/srl_advisor:participate', CAP_ALLOW, $roleid, $context->id, true);
+        role_assign($roleid, $researcher->id, $context->id);
+        $context->mark_dirty();
+        $this->assertTrue(has_capability('local/srl_advisor:participate', $context, $researcher));
+    }
 }

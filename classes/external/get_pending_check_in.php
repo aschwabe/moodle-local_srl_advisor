@@ -6,8 +6,8 @@
  * unit check-in payload (or empty) for the (current user, course, section)
  * triple. JSON shape mirrors the GET /api/v1/check-in backend contract.
  *
- * Capability: enrolment in $courseid (DEC-031 BLOCKER #2 — `is_enrolled`,
- * not the originally-suggested `mod/assign:view`).
+ * Capability: `local/srl_advisor:participate` in $courseid's context (DEC-062,
+ * supersedes the DEC-031 BLOCKER #2 `is_enrolled` gate).
  *
  * @package    local_srl_advisor
  * @copyright  2026 Andrew Schwabe
@@ -45,10 +45,11 @@ class get_pending_check_in extends external_api {
         $context = context_course::instance($params['courseid']);
         self::validate_context($context);
 
-        // BLOCKER #2: enrolment-only gate. Defends against forged courseid in the
-        // AJAX payload — the page-layer gate in lib.php only proves the user was
-        // enrolled in *some* course, not the one in this request.
-        if (!is_enrolled($context, $USER, '', true)) {
+        // Capability gate (DEC-062, supersedes BLOCKER #2). Defends against forged
+        // courseid in the AJAX payload — the participate cap is resolved against
+        // THIS course's context, so a forged courseid the user has no role in
+        // yields no capability and is rejected.
+        if (!has_capability('local/srl_advisor:participate', $context, $USER)) {
             return self::empty_payload();
         }
 

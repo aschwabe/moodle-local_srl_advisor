@@ -7,9 +7,10 @@
  * mints a fresh JWT, forwards the batch to backend
  * `POST /api/v1/behavior-events`, and returns `{ok, accepted, skipped, error?}`.
  *
- * Enrolment gate matches the inline check-in pattern (BLOCKER #2): the AJAX
- * caller's $courseid is re-checked server-side via `is_enrolled()` against
- * $USER. AMD must NOT forward an arbitrary courseid.
+ * Capability gate matches the inline check-in pattern (DEC-062): the AJAX
+ * caller's $courseid is re-checked server-side via
+ * `has_capability('local/srl_advisor:participate', ...)` against $USER. AMD
+ * must NOT forward an arbitrary courseid.
  *
  * @package    local_srl_advisor
  * @copyright  2026 Andrew Schwabe
@@ -58,7 +59,7 @@ class record_behavior_events extends external_api {
 
         $context = context_course::instance($courseid);
         self::validate_context($context);
-        if (!is_enrolled($context, $USER, '', true)) {
+        if (!has_capability('local/srl_advisor:participate', $context, $USER)) {
             return ['ok' => false, 'error' => 'not_enrolled', 'accepted' => 0, 'skipped' => 0];
         }
 
