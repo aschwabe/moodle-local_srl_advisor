@@ -27,7 +27,7 @@
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #d93545;
+    color: #9e1b2a; /* WCAG 2.2 AA: >=4.5:1 on #fff5f5 panel (DEC-069) */
     margin-bottom: 0.4rem;
 }
 
@@ -93,19 +93,19 @@
 }
 
 .srladvisor-check-in__status {
-    color: #6c757d;
+    color: #495057; /* WCAG 2.2 AA: >=4.5:1 on #fff5f5 (DEC-069) */
     font-size: 0.9rem;
     margin: 0.5rem 0 0 0;
     min-height: 1.2rem;
 }
 
 .srladvisor-check-in__status--success {
-    color: #198754;
+    color: #146c43; /* WCAG 2.2 AA: >=4.5:1 on #fff5f5 (DEC-069) */
     font-weight: 600;
 }
 
 .srladvisor-check-in__status--error {
-    color: #d93545;
+    color: #9e1b2a; /* WCAG 2.2 AA: >=4.5:1 on #fff5f5 (DEC-069) */
 }
 
 /* --- Top-right navbar icon + badge --------------------------------------- */

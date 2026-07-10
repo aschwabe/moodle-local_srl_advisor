@@ -279,6 +279,9 @@ define([
             dismiss(courseid, task.task_id, '', idemKey).then(function(res) {
                 if (res.ok) {
                     $panel.remove();
+                    // WCAG 2.2 AA 2.4.3 (DEC-069): panel destroyed on dismiss;
+                    // move focus to the mount container so it isn't lost to <body>.
+                    $(mount).attr('tabindex', '-1').trigger('focus');
                     return;
                 }
                 $status.text(strings.error_generic);
