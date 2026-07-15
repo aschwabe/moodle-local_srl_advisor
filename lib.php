@@ -224,6 +224,51 @@ function local_srl_advisor_get_pending_count($backend_url, $jwt) {
 }
 
 /**
+ * Consent gate for passive telemetry injection (IRB/GDPR).
+ *
+ * Returns true only when the backend reports an ACTIVE consent record for this
+ * pseudonymous participant. Result is cached in MUC (`consent_status`, 5-min
+ * TTL) so the check adds no noticeable page-load latency. Fail-closed: any
+ * transport/backend error returns false AND is NOT cached, so a brief outage
+ * never locks a consented student out for the full TTL once the backend
+ * recovers. Only definitive true/false answers are cached.
+ *
+ * Callers MUST skip injecting any telemetry AMD module when this returns false.
+ * The backend's ingest-time rejection (POST /api/v1/behavior-events) remains a
+ * defense-in-depth second layer; this gate stops transmission at the source.
+ *
+ * @param int    $courseid         Moodle course id (for the JWT audience).
+ * @param string $pseudonymous_id  sha256(user_id . site_identifier).
+ * @param string $api_token        Plugin-configured signing token.
+ * @return bool  True iff the student has an active consent record.
+ */
+function local_srl_advisor_student_has_consented($courseid, $pseudonymous_id, $api_token) {
+    $cache = cache::make('local_srl_advisor', 'consent_status');
+    $hit = $cache->get($pseudonymous_id);
+    if ($hit !== false) {
+        return $hit === 1;
+    }
+
+    $jwt = local_srl_advisor_build_jwt($courseid, $pseudonymous_id, $api_token);
+    $result = local_srl_advisor_relay_backend_call(
+        'consent_gate',
+        '/api/v1/consent-status/' . rawurlencode($pseudonymous_id),
+        'GET',
+        null,
+        $jwt,
+        3
+    );
+    if (!$result['ok']) {
+        // Fail closed; do not cache transient failures.
+        return false;
+    }
+
+    $consented = !empty($result['data']['consented']);
+    $cache->set($pseudonymous_id, $consented ? 1 : 0);
+    return $consented;
+}
+
+/**
  * Injects an "SRL Advisor" link into the course navigation if the current
  * course is in the admin-managed list of enabled courses.
  * Appends a numeric badge to the label when the student has pending action items.
@@ -480,6 +525,11 @@ function local_srl_advisor_render_before_footer() {
         return;
     }
 
+    // Pseudonymous participant id — computed once here and reused by the
+    // telemetry consent gate (below) and the summative banner call further
+    // down. sha256(user_id . site_identifier); same scheme as the launch flow.
+    $pseudonymous_id = hash('sha256', $USER->id . $CFG->siteidentifier);
+
     // --- v1.1 inline check-in AMD inject (DEC-031 + DEC-048 follow-up) ----
     // Widened from mod-page-view-only to also include mod-assign-view and
     // mod-quiz-view so the post check-in can render on a section's last
@@ -532,7 +582,12 @@ function local_srl_advisor_render_before_footer() {
             // have their own content models (interactive forms, submission UIs)
             // where reading-engagement signals don't map to the question these
             // labs measure. Keep the original mod-page-view gate.
-            if ($is_mod_page) {
+            // CONSENT GATE (IRB/GDPR) — telemetry AMD modules attach listeners
+            // and transmit behavior events. Non-consented students must send
+            // NOTHING, so gate injection on an active consent record (MUC-
+            // cached, fail-closed). Backend ingest-time drop is defense-in-depth.
+            if ($is_mod_page
+                    && local_srl_advisor_student_has_consented($courseid, $pseudonymous_id, $api_token)) {
                 $PAGE->requires->js_call_amd(
                     'local_srl_advisor/scroll_telemetry',
                     'init',
@@ -563,7 +618,9 @@ function local_srl_advisor_render_before_footer() {
     // via /mod/resource/view.php. Mount the download module here so those
     // clicks are captured even when the student never opens a Page.
     // sectionid + cmid are null on course-view; AMD accepts null gracefully.
-    if ($is_course && !$is_mod_activity) {
+    // Same consent gate as the mod-page telemetry block above.
+    if ($is_course && !$is_mod_activity
+            && local_srl_advisor_student_has_consented($courseid, $pseudonymous_id, $api_token)) {
         $PAGE->requires->js_call_amd(
             'local_srl_advisor/download_telemetry',
             'init',
@@ -575,7 +632,7 @@ function local_srl_advisor_render_before_footer() {
     // Render on every gated course-view-* AND mod-page-view render so the
     // student sees the prompt regardless of where they land after finishing
     // the course. Single backend round-trip per render; no AMD/AJAX.
-    $pseudonymous_id = hash('sha256', $USER->id . $CFG->siteidentifier);
+    // $pseudonymous_id computed once after the capability gate above.
     $jwt = local_srl_advisor_build_jwt($courseid, $pseudonymous_id, $api_token);
     $result = local_srl_advisor_relay_backend_call('banner', '/api/v1/action-items', 'GET', null, $jwt);
     if (!$result['ok']) {

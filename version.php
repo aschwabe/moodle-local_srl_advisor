@@ -9,7 +9,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026062200;   // DEC-062: db/access.php capability + external-location Privacy API; is_enrolled→has_capability swap.
+$plugin->version   = 2026071500;   // Consent gate for telemetry injection: db/caches.php MUC def + lib.php client-side consent check.
 $plugin->requires  = 2024100700;   // Requires Moodle 4.5+ (DEC-031).
 $plugin->component = 'local_srl_advisor';
 $plugin->maturity  = MATURITY_ALPHA;
