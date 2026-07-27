@@ -1,4 +1,19 @@
 <?php
+// This file is part of Moodle - https://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
+
 /**
  * PHPUnit smoke tests for v1.1 inline check-in plumbing (DEC-031).
  *
@@ -25,12 +40,22 @@ defined('MOODLE_INTERNAL') || die();
 global $CFG;
 require_once($CFG->dirroot . '/local/srl_advisor/lib.php');
 
-class local_srl_advisor_check_in_inline_smoke_test extends advanced_testcase {
-
+/**
+ * PHPUnit smoke tests for v1.1 inline check-in plumbing (DEC-031).
+ *
+ * @package    local_srl_advisor
+ * @copyright  2026 Andrew Schwabe
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+class check_in_inline_smoke_test extends advanced_testcase {
     public function test_relay_helper_refuses_non_api_v1_path() {
         $this->resetAfterTest();
         $result = local_srl_advisor_relay_backend_call(
-            'inline_get', '/some/other/path', 'GET', null, 'dummy.jwt'
+            'inline_get',
+            '/some/other/path',
+            'GET',
+            null,
+            'dummy.jwt'
         );
         $this->assertFalse($result['ok']);
         $this->assertSame('transport', $result['error_kind']);
@@ -42,7 +67,11 @@ class local_srl_advisor_check_in_inline_smoke_test extends advanced_testcase {
         set_config('backend_url', '', 'local_srl_advisor');
 
         $result = local_srl_advisor_relay_backend_call(
-            'inline_get', '/api/v1/check-in', 'GET', null, 'dummy.jwt'
+            'inline_get',
+            '/api/v1/check-in',
+            'GET',
+            null,
+            'dummy.jwt'
         );
         $this->assertFalse($result['ok']);
         $this->assertSame('transport', $result['error_kind']);
@@ -58,7 +87,7 @@ class local_srl_advisor_check_in_inline_smoke_test extends advanced_testcase {
         $this->assertArrayHasKey('iat', $payload);
         $this->assertArrayHasKey('exp', $payload);
         $this->assertSame(30, (int)$payload['exp'] - (int)$payload['iat']);
-        // section_id default is null — preserves backward-compatible payload shape.
+        // Section_id default is null — preserves backward-compatible payload shape.
         $this->assertArrayHasKey('section_id', $payload);
         $this->assertNull($payload['section_id']);
     }
@@ -91,7 +120,12 @@ class local_srl_advisor_check_in_inline_smoke_test extends advanced_testcase {
         }
     }
 
-    /** URL-safe base64 → JSON-decoded payload claim array. */
+    /**
+     * Decode a URL-safe base64 segment into a JSON-decoded payload claim array.
+     *
+     * @param string $segment URL-safe base64-encoded JWT segment.
+     * @return array Decoded claim array.
+     */
     private function decode_jwt_payload(string $segment): array {
         $padded = strtr($segment, '-_', '+/') . str_repeat('=', (4 - strlen($segment) % 4) % 4);
         $decoded = json_decode(base64_decode($padded), true);

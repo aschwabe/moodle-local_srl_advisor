@@ -1,4 +1,19 @@
 <?php
+// This file is part of Moodle - https://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
+
 /**
  * External function: get_pending_check_in (DEC-031 v1.1 inline check-ins).
  *
@@ -16,8 +31,6 @@
 
 namespace local_srl_advisor\external;
 
-defined('MOODLE_INTERNAL') || die();
-
 use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_multiple_structure;
@@ -25,8 +38,19 @@ use core_external\external_single_structure;
 use core_external\external_value;
 use context_course;
 
+/**
+ * External function to retrieve the pending inline check-in payload.
+ *
+ * @package    local_srl_advisor
+ * @copyright  2026 Andrew Schwabe
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 class get_pending_check_in extends external_api {
-
+    /**
+     * Declare parameters for the get_pending_check_in external function.
+     *
+     * @return external_function_parameters
+     */
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'courseid'  => new external_value(PARAM_INT, 'Moodle course id', VALUE_REQUIRED),
@@ -34,6 +58,13 @@ class get_pending_check_in extends external_api {
         ]);
     }
 
+    /**
+     * Return the pending check-in payload for the current user, course and section.
+     *
+     * @param int $courseid  Moodle course id.
+     * @param int $sectionid Moodle course_sections.id (not sectionnum).
+     * @return array Payload with has_task and related fields.
+     */
     public static function execute(int $courseid, int $sectionid): array {
         global $CFG, $USER;
 
@@ -53,9 +84,9 @@ class get_pending_check_in extends external_api {
             return self::empty_payload();
         }
 
-        $backend_url = trim((string)get_config('local_srl_advisor', 'backend_url'));
-        $api_token   = trim((string)get_config('local_srl_advisor', 'api_token'));
-        if (empty($backend_url) || empty($api_token)) {
+        $backendurl = trim((string)get_config('local_srl_advisor', 'backend_url'));
+        $apitoken   = trim((string)get_config('local_srl_advisor', 'api_token'));
+        if (empty($backendurl) || empty($apitoken)) {
             debugging('local_srl_advisor[inline_get]: plugin not configured', DEBUG_DEVELOPER);
             return self::empty_payload();
         }
@@ -66,29 +97,33 @@ class get_pending_check_in extends external_api {
         // can stamp portal task labels with the unit name. Falls back to
         // "Topic N" using `sectionnum` if the operator left `name` blank.
         global $DB;
-        $section_label = null;
-        $section_row = $DB->get_record('course_sections', ['id' => $params['sectionid']], 'name,section');
-        if ($section_row) {
-            $candidate = isset($section_row->name) ? trim((string)$section_row->name) : '';
-            if ($candidate === '' && isset($section_row->section)) {
-                $candidate = get_string('section') . ' ' . (int)$section_row->section;
+        $sectionlabel = null;
+        $sectionrow = $DB->get_record('course_sections', ['id' => $params['sectionid']], 'name,section');
+        if ($sectionrow) {
+            $candidate = isset($sectionrow->name) ? trim((string)$sectionrow->name) : '';
+            if ($candidate === '' && isset($sectionrow->section)) {
+                $candidate = get_string('section') . ' ' . (int)$sectionrow->section;
             }
-            $section_label = ($candidate !== '') ? $candidate : null;
+            $sectionlabel = ($candidate !== '') ? $candidate : null;
         }
 
         $pseudo = hash('sha256', $USER->id . $CFG->siteidentifier);
         $jwt = local_srl_advisor_build_jwt(
             $params['courseid'],
             $pseudo,
-            $api_token,
+            $apitoken,
             30,
             $params['sectionid'],
-            $section_label
+            $sectionlabel
         );
         $path = '/api/v1/check-in?section_id=' . $params['sectionid'];
 
         $result = local_srl_advisor_relay_backend_call(
-            'inline_get', $path, 'GET', null, $jwt
+            'inline_get',
+            $path,
+            'GET',
+            null,
+            $jwt
         );
         if (!$result['ok']) {
             return self::empty_payload();
@@ -127,6 +162,11 @@ class get_pending_check_in extends external_api {
         ];
     }
 
+    /**
+     * Return the empty payload structure used when no task is pending.
+     *
+     * @return array Empty payload with has_task=false.
+     */
     private static function empty_payload(): array {
         return [
             'has_task'              => false,
@@ -141,6 +181,11 @@ class get_pending_check_in extends external_api {
         ];
     }
 
+    /**
+     * Describe the return value of get_pending_check_in.
+     *
+     * @return external_single_structure
+     */
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
             'has_task'             => new external_value(PARAM_BOOL, 'True when a panel should render'),
@@ -157,11 +202,20 @@ class get_pending_check_in extends external_api {
                     'description'     => new external_value(PARAM_TEXT, 'Student-facing description (kind=strategy)'),
                     'label'           => new external_value(PARAM_TEXT, 'No-strategy/Other label (kind=no_strategy|other)'),
                     'is_no_strategy'  => new external_value(PARAM_BOOL, 'True when kind=no_strategy; drives the Mustache branch'),
-                    'is_other'        => new external_value(PARAM_BOOL, 'True when kind=other; drives the Mustache branch + AMD text-input reveal'),
+                    'is_other'        => new external_value(
+                        PARAM_BOOL,
+                        'True when kind=other; drives the Mustache branch + AMD text-input reveal'
+                    ),
                 ])
             ),
-            'previous_strategy_id' => new external_value(PARAM_INT, 'Strategy_id from this participant\'s pre answer in the same section (0 = none / no_strategy)'),
-            'render_started_at_ms' => new external_value(PARAM_INT, 'Server-stamped epoch ms; AMD subtracts to compute response_time_ms'),
+            'previous_strategy_id' => new external_value(
+                PARAM_INT,
+                'Strategy id from this participant\'s pre answer in the same section (0 = none / no_strategy)'
+            ),
+            'render_started_at_ms' => new external_value(
+                PARAM_INT,
+                'Server-stamped epoch ms; AMD subtracts to compute response_time_ms'
+            ),
         ]);
     }
 }

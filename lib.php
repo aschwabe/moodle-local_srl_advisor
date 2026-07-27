@@ -1,4 +1,19 @@
 <?php
+// This file is part of Moodle - https://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
+
 /**
  * Library functions for the SRL Advisor local plugin.
  *
@@ -10,8 +25,6 @@
  * @copyright  2026 Andrew Schwabe
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-
-defined('MOODLE_INTERNAL') || die();
 
 /**
  * Builds a signed JWT for server-to-server calls to the SRL Advisor API.
@@ -40,33 +53,33 @@ defined('MOODLE_INTERNAL') || die();
  */
 function local_srl_advisor_build_jwt(
     $courseid,
-    $pseudonymous_id,
-    $api_token,
-    $ttl_seconds = 30,
-    $section_id = null,
-    $section_label = null
+    $pseudonymousid,
+    $apitoken,
+    $ttlseconds = 30,
+    $sectionid = null,
+    $sectionlabel = null
 ) {
     global $CFG;
 
-    $issued_at  = time();
-    $expires_at = $issued_at + (int)$ttl_seconds;
+    $issuedat  = time();
+    $expiresat = $issuedat + (int)$ttlseconds;
 
     $claims = [
         'iss'        => parse_url($CFG->wwwroot, PHP_URL_HOST),
-        'sub'        => $pseudonymous_id,
+        'sub'        => $pseudonymousid,
         'course_id'  => $courseid,
-        'section_id' => $section_id,
-        'iat'        => $issued_at,
-        'exp'        => $expires_at,
+        'section_id' => $sectionid,
+        'iat'        => $issuedat,
+        'exp'        => $expiresat,
     ];
-    if (!empty($section_label)) {
-        $claims['section_label'] = (string)$section_label;
+    if (!empty($sectionlabel)) {
+        $claims['section_label'] = (string)$sectionlabel;
     }
 
     $header  = rtrim(strtr(base64_encode(json_encode(['alg' => 'HS256', 'typ' => 'JWT'])), '+/', '-_'), '=');
     $payload = rtrim(strtr(base64_encode(json_encode($claims)), '+/', '-_'), '=');
 
-    $signature = rtrim(strtr(base64_encode(hash_hmac('sha256', "$header.$payload", $api_token, true)), '+/', '-_'), '=');
+    $signature = rtrim(strtr(base64_encode(hash_hmac('sha256', "$header.$payload", $apitoken, true)), '+/', '-_'), '=');
 
     return "$header.$payload.$signature";
 }
@@ -99,7 +112,7 @@ function local_srl_advisor_build_jwt(
  *   string|null error_kind,  'transport' | 'backend' | 'parse' | null on success
  * }
  */
-function local_srl_advisor_relay_backend_call($category, $path, $method, $body, $jwt, $timeout = 3, $extra_headers = []) {
+function local_srl_advisor_relay_backend_call($category, $path, $method, $body, $jwt, $timeout = 3, $extraheaders = []) {
     // Defensive: refuse arbitrary paths even if upstream construction is broken.
     if (strpos($path, '/api/v1/') !== 0) {
         debugging(
@@ -109,8 +122,8 @@ function local_srl_advisor_relay_backend_call($category, $path, $method, $body, 
         return ['ok' => false, 'http_code' => 0, 'data' => null, 'raw' => '', 'error_kind' => 'transport'];
     }
 
-    $backend_url = trim((string)get_config('local_srl_advisor', 'backend_url'));
-    if (empty($backend_url)) {
+    $backendurl = trim((string)get_config('local_srl_advisor', 'backend_url'));
+    if (empty($backendurl)) {
         debugging(
             "local_srl_advisor[{$category}]: backend_url not configured",
             DEBUG_DEVELOPER
@@ -118,14 +131,14 @@ function local_srl_advisor_relay_backend_call($category, $path, $method, $body, 
         return ['ok' => false, 'http_code' => 0, 'data' => null, 'raw' => '', 'error_kind' => 'transport'];
     }
 
-    $url = rtrim($backend_url, '/') . $path;
-    $insecure_ssl = (bool)get_config('local_srl_advisor', 'insecure_ssl');
+    $url = rtrim($backendurl, '/') . $path;
+    $insecuressl = (bool)get_config('local_srl_advisor', 'insecure_ssl');
 
     $headers = ["Authorization: Bearer $jwt"];
     if ($method === 'POST' && $body !== null) {
         $headers[] = 'Content-Type: application/json';
     }
-    foreach ($extra_headers as $h) {
+    foreach ($extraheaders as $h) {
         $headers[] = $h;
     }
 
@@ -134,8 +147,8 @@ function local_srl_advisor_relay_backend_call($category, $path, $method, $body, 
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT        => $timeout,
         CURLOPT_HTTPHEADER     => $headers,
-        CURLOPT_SSL_VERIFYPEER => $insecure_ssl ? false : true,
-        CURLOPT_SSL_VERIFYHOST => $insecure_ssl ? 0 : 2,
+        CURLOPT_SSL_VERIFYPEER => $insecuressl ? false : true,
+        CURLOPT_SSL_VERIFYHOST => $insecuressl ? 0 : 2,
     ];
     if ($method === 'POST') {
         $opts[CURLOPT_POST] = true;
@@ -144,20 +157,19 @@ function local_srl_advisor_relay_backend_call($category, $path, $method, $body, 
     curl_setopt_array($ch, $opts);
 
     $response  = curl_exec($ch);
-    $curl_errno = curl_errno($ch);
-    $curl_err   = curl_error($ch);
-    $http_code  = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
+    $curlerrno = curl_errno($ch);
+    $curlerr   = curl_error($ch);
+    $httpcode  = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
 
     // Transport failure — curl could not complete the round-trip.
-    if ($response === false || $curl_errno !== 0) {
+    if ($response === false || $curlerrno !== 0) {
         debugging(
-            "local_srl_advisor[{$category}]: transport failure (url={$url}, errno={$curl_errno}, err={$curl_err})",
+            "local_srl_advisor[{$category}]: transport failure (url={$url}, errno={$curlerrno}, err={$curlerr})",
             DEBUG_DEVELOPER
         );
         return [
             'ok' => false,
-            'http_code' => $http_code,
+            'http_code' => $httpcode,
             'data' => null,
             'raw' => (string)$response,
             'error_kind' => 'transport',
@@ -165,14 +177,14 @@ function local_srl_advisor_relay_backend_call($category, $path, $method, $body, 
     }
 
     // Backend reachable but returned a non-2xx status — log body slice.
-    if ($http_code < 200 || $http_code >= 300) {
+    if ($httpcode < 200 || $httpcode >= 300) {
         debugging(
-            "local_srl_advisor[{$category}]: backend {$http_code} (url={$url}, body=" . substr((string)$response, 0, 200) . ")",
+            "local_srl_advisor[{$category}]: backend {$httpcode} (url={$url}, body=" . substr((string)$response, 0, 200) . ")",
             DEBUG_DEVELOPER
         );
         return [
             'ok' => false,
-            'http_code' => $http_code,
+            'http_code' => $httpcode,
             'data' => null,
             'raw' => (string)$response,
             'error_kind' => 'backend',
@@ -187,7 +199,7 @@ function local_srl_advisor_relay_backend_call($category, $path, $method, $body, 
         );
         return [
             'ok' => false,
-            'http_code' => $http_code,
+            'http_code' => $httpcode,
             'data' => null,
             'raw' => (string)$response,
             'error_kind' => 'parse',
@@ -196,7 +208,7 @@ function local_srl_advisor_relay_backend_call($category, $path, $method, $body, 
 
     return [
         'ok' => true,
-        'http_code' => $http_code,
+        'http_code' => $httpcode,
         'data' => $data,
         'raw' => (string)$response,
         'error_kind' => null,
@@ -215,7 +227,7 @@ function local_srl_advisor_relay_backend_call($category, $path, $method, $body, 
  * @param string $jwt           Signed JWT for Bearer authentication.
  * @return int  Number of pending action items (0 on error).
  */
-function local_srl_advisor_get_pending_count($backend_url, $jwt) {
+function local_srl_advisor_get_pending_count($backendurl, $jwt) {
     $result = local_srl_advisor_relay_backend_call('badge', '/api/v1/action-items', 'GET', null, $jwt);
     if (!$result['ok']) {
         return 0;
@@ -242,17 +254,17 @@ function local_srl_advisor_get_pending_count($backend_url, $jwt) {
  * @param string $api_token        Plugin-configured signing token.
  * @return bool  True iff the student has an active consent record.
  */
-function local_srl_advisor_student_has_consented($courseid, $pseudonymous_id, $api_token) {
+function local_srl_advisor_student_has_consented($courseid, $pseudonymousid, $apitoken) {
     $cache = cache::make('local_srl_advisor', 'consent_status');
-    $hit = $cache->get($pseudonymous_id);
+    $hit = $cache->get($pseudonymousid);
     if ($hit !== false) {
         return $hit === 1;
     }
 
-    $jwt = local_srl_advisor_build_jwt($courseid, $pseudonymous_id, $api_token);
+    $jwt = local_srl_advisor_build_jwt($courseid, $pseudonymousid, $apitoken);
     $result = local_srl_advisor_relay_backend_call(
         'consent_gate',
-        '/api/v1/consent-status/' . rawurlencode($pseudonymous_id),
+        '/api/v1/consent-status/' . rawurlencode($pseudonymousid),
         'GET',
         null,
         $jwt,
@@ -264,7 +276,7 @@ function local_srl_advisor_student_has_consented($courseid, $pseudonymous_id, $a
     }
 
     $consented = !empty($result['data']['consented']);
-    $cache->set($pseudonymous_id, $consented ? 1 : 0);
+    $cache->set($pseudonymousid, $consented ? 1 : 0);
     return $consented;
 }
 
@@ -290,53 +302,59 @@ function local_srl_advisor_extend_navigation_course($navigation, $course, $conte
     }
 
     // Check if the plugin is configured.
-    $backend_url = trim(get_config('local_srl_advisor', 'backend_url'));
-    $api_token   = trim(get_config('local_srl_advisor', 'api_token'));
-    if (empty($backend_url) || empty($api_token)) {
-        debugging("local_srl_advisor: SKIP — backend_url or api_token empty (backend_url_set=" . (!empty($backend_url) ? '1' : '0') . " api_token_set=" . (!empty($api_token) ? '1' : '0') . ")", DEBUG_DEVELOPER);
+    $backendurl = trim(get_config('local_srl_advisor', 'backend_url'));
+    $apitoken   = trim(get_config('local_srl_advisor', 'api_token'));
+    if (empty($backendurl) || empty($apitoken)) {
+        $backendflag = !empty($backendurl) ? '1' : '0';
+        $tokenflag   = !empty($apitoken) ? '1' : '0';
+        debugging(
+            "local_srl_advisor: SKIP — backend_url or api_token empty" .
+            " (backend_url_set={$backendflag} api_token_set={$tokenflag})",
+            DEBUG_DEVELOPER
+        );
         return;
     }
 
     // Check if the current course is in the admin-defined allowlist.
-    $enabled_ids_raw = get_config('local_srl_advisor', 'enabled_course_ids');
-    if (empty($enabled_ids_raw)) {
+    $enabledidsraw = get_config('local_srl_advisor', 'enabled_course_ids');
+    if (empty($enabledidsraw)) {
         debugging("local_srl_advisor: SKIP — enabled_course_ids config is empty", DEBUG_DEVELOPER);
         return;
     }
 
-    $enabled_ids = array_map('trim', explode(',', $enabled_ids_raw));
-    if (!in_array((string)$course->id, $enabled_ids)) {
-        debugging("local_srl_advisor: SKIP — courseid {$course->id} not in enabled_course_ids=[{$enabled_ids_raw}]", DEBUG_DEVELOPER);
+    $enabledids = array_map('trim', explode(',', $enabledidsraw));
+    if (!in_array((string)$course->id, $enabledids)) {
+        debugging("local_srl_advisor: SKIP — courseid {$course->id} not in enabled_course_ids=[{$enabledidsraw}]", DEBUG_DEVELOPER);
         return;
     }
 
-    debugging("local_srl_advisor: PASS gates — calling action-items API (backend_url={$backend_url})", DEBUG_DEVELOPER);
+    debugging("local_srl_advisor: PASS gates — calling action-items API (backend_url={$backendurl})", DEBUG_DEVELOPER);
 
     // Derive the pseudonymous user ID (matches what launch.php sends).
-    $pseudonymous_id = hash('sha256', $USER->id . $CFG->siteidentifier);
+    $pseudonymousid = hash('sha256', $USER->id . $CFG->siteidentifier);
 
     // Query the SRL Advisor API for pending action items.
-    $jwt           = local_srl_advisor_build_jwt($course->id, $pseudonymous_id, $api_token);
-    $pending_count = local_srl_advisor_get_pending_count($backend_url, $jwt);
-    debugging("local_srl_advisor: pending_count={$pending_count} — rendering nav node", DEBUG_DEVELOPER);
+    $jwt           = local_srl_advisor_build_jwt($course->id, $pseudonymousid, $apitoken);
+    $pendingcount = local_srl_advisor_get_pending_count($backendurl, $jwt);
+    debugging("local_srl_advisor: pending_count={$pendingcount} — rendering nav node", DEBUG_DEVELOPER);
 
     // Build the nav label — append a Bootstrap pill badge when there are pending items.
     // Boost theme ships Bootstrap 4/5 utility classes; Moodle's nav renderer emits label HTML
     // unescaped, so the span renders as a red rounded-pill next to the link text.
     $label = get_string('nav_link', 'local_srl_advisor');
-    if ($pending_count > 0) {
+    if ($pendingcount > 0) {
         $label .= ' <span class="badge bg-danger text-white rounded-pill ms-1">'
-            . (int)$pending_count
+            . (int)$pendingcount
             . '</span>';
     }
 
     // Build the URL for the launch page, passing the current course ID.
-    $launch_url = new moodle_url('/local/srl_advisor/launch.php', ['courseid' => $course->id]);
+    $launchurl = new moodle_url('/local/srl_advisor/launch.php', ['courseid' => $course->id]);
 
     // Add the link to the course navigation under the course root node.
     $node = navigation_node::create(
         $label,
-        $launch_url,
+        $launchurl,
         navigation_node::TYPE_CUSTOM,
         null,
         'local_srl_advisor',
@@ -373,18 +391,18 @@ function local_srl_advisor_render_navbar_output(\renderer_base $renderer): strin
     }
     $courseid = (int)$course->id;
 
-    $backend_url = trim((string)get_config('local_srl_advisor', 'backend_url'));
-    $api_token   = trim((string)get_config('local_srl_advisor', 'api_token'));
-    if (empty($backend_url) || empty($api_token)) {
+    $backendurl = trim((string)get_config('local_srl_advisor', 'backend_url'));
+    $apitoken   = trim((string)get_config('local_srl_advisor', 'api_token'));
+    if (empty($backendurl) || empty($apitoken)) {
         return '';
     }
 
-    $enabled_ids_raw = (string)get_config('local_srl_advisor', 'enabled_course_ids');
-    if ($enabled_ids_raw === '') {
+    $enabledidsraw = (string)get_config('local_srl_advisor', 'enabled_course_ids');
+    if ($enabledidsraw === '') {
         return '';
     }
-    $enabled_ids = array_map('trim', explode(',', $enabled_ids_raw));
-    if (!in_array((string)$courseid, $enabled_ids, true)) {
+    $enabledids = array_map('trim', explode(',', $enabledidsraw));
+    if (!in_array((string)$courseid, $enabledids, true)) {
         return '';
     }
 
@@ -399,31 +417,31 @@ function local_srl_advisor_render_navbar_output(\renderer_base $renderer): strin
     // a bug to the student. 5s is short enough that completion → next page
     // render shows the correct count, while still throttling the rapid-fire
     // case of a student scrolling through many course pages.
-    $cache_key = "srl_navbar_count_{$courseid}";
-    $cache_at_key = "srl_navbar_count_at_{$courseid}";
+    $cachekey = "srl_navbar_count_{$courseid}";
+    $cacheatkey = "srl_navbar_count_at_{$courseid}";
     $now = time();
-    $cached = isset($SESSION->{$cache_key}) ? (int)$SESSION->{$cache_key} : null;
-    $cached_at = isset($SESSION->{$cache_at_key}) ? (int)$SESSION->{$cache_at_key} : 0;
+    $cached = isset($SESSION->{$cachekey}) ? (int)$SESSION->{$cachekey} : null;
+    $cachedat = isset($SESSION->{$cacheatkey}) ? (int)$SESSION->{$cacheatkey} : 0;
 
-    if ($cached !== null && ($now - $cached_at) < 5) {
-        $pending_count = $cached;
+    if ($cached !== null && ($now - $cachedat) < 5) {
+        $pendingcount = $cached;
     } else {
-        $pseudonymous_id = hash('sha256', $USER->id . $CFG->siteidentifier);
-        $jwt = local_srl_advisor_build_jwt($courseid, $pseudonymous_id, $api_token);
-        $pending_count = (int)local_srl_advisor_get_pending_count($backend_url, $jwt);
-        $SESSION->{$cache_key} = $pending_count;
-        $SESSION->{$cache_at_key} = $now;
+        $pseudonymousid = hash('sha256', $USER->id . $CFG->siteidentifier);
+        $jwt = local_srl_advisor_build_jwt($courseid, $pseudonymousid, $apitoken);
+        $pendingcount = (int)local_srl_advisor_get_pending_count($backendurl, $jwt);
+        $SESSION->{$cachekey} = $pendingcount;
+        $SESSION->{$cacheatkey} = $now;
     }
 
-    $launch_url = (new \moodle_url('/local/srl_advisor/launch.php', ['courseid' => $courseid]))->out(false);
+    $launchurl = (new \moodle_url('/local/srl_advisor/launch.php', ['courseid' => $courseid]))->out(false);
     $aria = get_string('nav_link', 'local_srl_advisor');
-    $tooltip = $pending_count > 0
-        ? get_string('navbar_tooltip_with_pending', 'local_srl_advisor', $pending_count)
+    $tooltip = $pendingcount > 0
+        ? get_string('navbar_tooltip_with_pending', 'local_srl_advisor', $pendingcount)
         : get_string('navbar_tooltip_no_pending', 'local_srl_advisor');
-    $badge_html = '';
-    if ($pending_count > 0) {
-        $badge_html = '<span class="badge bg-danger text-white rounded-pill srladvisor-navbar__badge">'
-            . (int)$pending_count
+    $badgehtml = '';
+    if ($pendingcount > 0) {
+        $badgehtml = '<span class="badge bg-danger text-white rounded-pill srladvisor-navbar__badge">'
+            . (int)$pendingcount
             . '<span class="sr-only"> ' . s($aria) . '</span>'
             . '</span>';
     }
@@ -434,14 +452,14 @@ function local_srl_advisor_render_navbar_output(\renderer_base $renderer): strin
     // page header. The native `title` attribute is the fallback when JS is
     // disabled or the tooltip plugin failed to load.
     return '<div class="popover-region srladvisor-navbar">'
-        . '<a class="nav-link srladvisor-navbar__link" href="' . htmlspecialchars($launch_url) . '" '
+        . '<a class="nav-link srladvisor-navbar__link" href="' . htmlspecialchars($launchurl) . '" '
         . 'title="' . s($tooltip) . '" '
         . 'aria-label="' . s($tooltip) . '" '
         . 'data-toggle="tooltip" data-bs-toggle="tooltip" '
         . 'data-placement="bottom" data-bs-placement="bottom">'
         . '<span class="srladvisor-navbar__icon-wrap">'
         . '<i class="icon fa fa-graduation-cap fa-fw" aria-hidden="true"></i>'
-        . $badge_html
+        . $badgehtml
         . '</span>'
         . '</a></div>';
 }
@@ -478,12 +496,12 @@ function local_srl_advisor_render_before_footer() {
     }
 
     $pagetype = (string)$PAGE->pagetype;
-    $is_mod_page    = ($pagetype === 'mod-page-view');
-    $is_mod_assign  = ($pagetype === 'mod-assign-view');
-    $is_mod_quiz    = ($pagetype === 'mod-quiz-view');
-    $is_mod_activity = $is_mod_page || $is_mod_assign || $is_mod_quiz;
-    $is_course    = (strpos($pagetype, 'course-view-') === 0);
-    if (!$is_mod_activity && !$is_course) {
+    $ismodpage    = ($pagetype === 'mod-page-view');
+    $ismodassign  = ($pagetype === 'mod-assign-view');
+    $ismodquiz    = ($pagetype === 'mod-quiz-view');
+    $ismodactivity = $ismodpage || $ismodassign || $ismodquiz;
+    $iscourse    = (strpos($pagetype, 'course-view-') === 0);
+    if (!$ismodactivity && !$iscourse) {
         return;
     }
 
@@ -492,8 +510,8 @@ function local_srl_advisor_render_before_footer() {
         return;
     }
 
-    // $PAGE->course is a magic-getter property on moodle_page. Read via local
-    // variable so PHP's `empty()` does not double-resolve through __isset()
+    // Moodle_page::$course is a magic-getter. Read into a local variable so
+    // PHP's `empty()` does not double-resolve through __isset()
     // (which is not defined on moodle_page and produces inconsistent results
     // depending on internal page state).
     $course = $PAGE->course ?? null;
@@ -503,19 +521,19 @@ function local_srl_advisor_render_before_footer() {
     $courseid = (int)$course->id;
 
     // Plugin configured?
-    $backend_url = trim((string)get_config('local_srl_advisor', 'backend_url'));
-    $api_token   = trim((string)get_config('local_srl_advisor', 'api_token'));
-    if (empty($backend_url) || empty($api_token)) {
+    $backendurl = trim((string)get_config('local_srl_advisor', 'backend_url'));
+    $apitoken   = trim((string)get_config('local_srl_advisor', 'api_token'));
+    if (empty($backendurl) || empty($apitoken)) {
         return;
     }
 
     // Course in allowlist?
-    $enabled_ids_raw = (string)get_config('local_srl_advisor', 'enabled_course_ids');
-    if (empty($enabled_ids_raw)) {
+    $enabledidsraw = (string)get_config('local_srl_advisor', 'enabled_course_ids');
+    if (empty($enabledidsraw)) {
         return;
     }
-    $enabled_ids = array_map('trim', explode(',', $enabled_ids_raw));
-    if (!in_array((string)$courseid, $enabled_ids, true)) {
+    $enabledids = array_map('trim', explode(',', $enabledidsraw));
+    if (!in_array((string)$courseid, $enabledids, true)) {
         return;
     }
 
@@ -528,16 +546,16 @@ function local_srl_advisor_render_before_footer() {
     // Pseudonymous participant id — computed once here and reused by the
     // telemetry consent gate (below) and the summative banner call further
     // down. sha256(user_id . site_identifier); same scheme as the launch flow.
-    $pseudonymous_id = hash('sha256', $USER->id . $CFG->siteidentifier);
+    $pseudonymousid = hash('sha256', $USER->id . $CFG->siteidentifier);
 
-    // --- v1.1 inline check-in AMD inject (DEC-031 + DEC-048 follow-up) ----
+    // V1.1 inline check-in AMD inject (DEC-031 + DEC-048 follow-up).
     // Widened from mod-page-view-only to also include mod-assign-view and
     // mod-quiz-view so the post check-in can render on a section's last
     // activity (typically the Reflection / Assignment), not just on a Reading
     // Page. First/last positions now computed against ALL cms in the section
     // sequence — pre fires on whichever cm the student lands on first, post
     // fires on the last cm. Single-cm sections render both on the same cm.
-    if ($is_mod_activity) {
+    if ($ismodactivity) {
         $cm = $PAGE->cm ?? null;
         if (!$cm || empty($cm->section)) {
             debugging('local_srl_advisor[inline_get]: mod-*-view without $PAGE->cm->section', DEBUG_DEVELOPER);
@@ -545,34 +563,43 @@ function local_srl_advisor_render_before_footer() {
             $sectionid = (int)$cm->section;
             global $DB;
             $sequence = (string)$DB->get_field('course_sections', 'sequence', ['id' => $sectionid]);
-            $cm_ids = array_values(array_filter(array_map('intval', explode(',', $sequence))));
-            $current_cmid = (int)$cm->id;
-            $is_first = !empty($cm_ids) && $cm_ids[0] === $current_cmid;
-            $is_last  = !empty($cm_ids) && end($cm_ids) === $current_cmid;
+            $cmids = array_values(array_filter(array_map('intval', explode(',', $sequence))));
+            $currentcmid = (int)$cm->id;
+            $isfirst = !empty($cmids) && $cmids[0] === $currentcmid;
+            $islast  = !empty($cmids) && end($cmids) === $currentcmid;
 
             // Same cm is both first and last (single-cm section) → emit both
             // phases. AMD's per-phase mount + sanity gate decides which panel
             // renders based on the backend's pending task.
             $phases = [];
-            if ($is_first) {
+            if ($isfirst) {
                 $phases[] = 'pre';
             }
-            if ($is_last && !$is_first) {
+            if ($islast && !$isfirst) {
                 $phases[] = 'post';
-            } elseif ($is_first && $is_last) {
+            } else if ($isfirst && $islast) {
                 $phases[] = 'post';
             }
 
             if (empty($phases)) {
-                debugging("local_srl_advisor[inline_get]: skip — cmid={$current_cmid} is not first/last in section {$sectionid} (sequence=" . implode(',', $cm_ids) . ')', DEBUG_DEVELOPER);
+                debugging(
+                    "local_srl_advisor[inline_get]: skip — cmid={$currentcmid} is not first/last" .
+                    " in section {$sectionid} (sequence=" . implode(',', $cmids) . ')',
+                    DEBUG_DEVELOPER
+                );
             } else {
-                $portal_url = (new moodle_url('/local/srl_advisor/launch.php', ['courseid' => $courseid]))->out(false);
-                debugging("local_srl_advisor[inline_get]: injecting AMD (courseid={$courseid}, sectionid={$sectionid}, cmid={$current_cmid}, pagetype={$pagetype}, phases=" . implode('+', $phases) . ", first={$is_first}, last={$is_last})", DEBUG_DEVELOPER);
+                $portalurl = (new moodle_url('/local/srl_advisor/launch.php', ['courseid' => $courseid]))->out(false);
+                debugging(
+                    "local_srl_advisor[inline_get]: injecting AMD (courseid={$courseid}," .
+                    " sectionid={$sectionid}, cmid={$currentcmid}, pagetype={$pagetype}," .
+                    " phases=" . implode('+', $phases) . ", first={$isfirst}, last={$islast})",
+                    DEBUG_DEVELOPER
+                );
                 foreach ($phases as $phase) {
                     $PAGE->requires->js_call_amd(
                         'local_srl_advisor/check_in',
                         'init',
-                        [$courseid, $sectionid, $portal_url, $phase]
+                        [$courseid, $sectionid, $portalurl, $phase]
                     );
                 }
             }
@@ -586,41 +613,45 @@ function local_srl_advisor_render_before_footer() {
             // and transmit behavior events. Non-consented students must send
             // NOTHING, so gate injection on an active consent record (MUC-
             // cached, fail-closed). Backend ingest-time drop is defense-in-depth.
-            if ($is_mod_page
-                    && local_srl_advisor_student_has_consented($courseid, $pseudonymous_id, $api_token)) {
+            if (
+                $ismodpage
+                    && local_srl_advisor_student_has_consented($courseid, $pseudonymousid, $apitoken)
+            ) {
                 $PAGE->requires->js_call_amd(
                     'local_srl_advisor/scroll_telemetry',
                     'init',
-                    [$courseid, $sectionid, $pagetype, $current_cmid]
+                    [$courseid, $sectionid, $pagetype, $currentcmid]
                 );
                 $PAGE->requires->js_call_amd(
                     'local_srl_advisor/video_telemetry',
                     'init',
-                    [$courseid, $sectionid, $pagetype, $current_cmid]
+                    [$courseid, $sectionid, $pagetype, $currentcmid]
                 );
                 $PAGE->requires->js_call_amd(
                     'local_srl_advisor/download_telemetry',
                     'init',
-                    [$courseid, $sectionid, $pagetype, $current_cmid]
+                    [$courseid, $sectionid, $pagetype, $currentcmid]
                 );
                 $PAGE->requires->js_call_amd(
                     'local_srl_advisor/clipboard_telemetry',
                     'init',
-                    [$courseid, $sectionid, $pagetype, $current_cmid]
+                    [$courseid, $sectionid, $pagetype, $currentcmid]
                 );
             }
         }
     }
 
-    // --- LAB-004 download telemetry on course-view-* (DEC-057) ----------
+    // LAB-004 download telemetry on course-view pages (DEC-057).
     // Section/course homepage is where students click mod-resource activity
     // links (PDF, slides, docx) — Moodle resolves these to the actual file
     // via /mod/resource/view.php. Mount the download module here so those
     // clicks are captured even when the student never opens a Page.
     // sectionid + cmid are null on course-view; AMD accepts null gracefully.
     // Same consent gate as the mod-page telemetry block above.
-    if ($is_course && !$is_mod_activity
-            && local_srl_advisor_student_has_consented($courseid, $pseudonymous_id, $api_token)) {
+    if (
+        $iscourse && !$ismodactivity
+            && local_srl_advisor_student_has_consented($courseid, $pseudonymousid, $apitoken)
+    ) {
         $PAGE->requires->js_call_amd(
             'local_srl_advisor/download_telemetry',
             'init',
@@ -628,31 +659,31 @@ function local_srl_advisor_render_before_footer() {
         );
     }
 
-    // --- DEC-032 end-of-course summative banner -------------------------
+    // DEC-032 end-of-course summative banner.
     // Render on every gated course-view-* AND mod-page-view render so the
     // student sees the prompt regardless of where they land after finishing
     // the course. Single backend round-trip per render; no AMD/AJAX.
     // $pseudonymous_id computed once after the capability gate above.
-    $jwt = local_srl_advisor_build_jwt($courseid, $pseudonymous_id, $api_token);
+    $jwt = local_srl_advisor_build_jwt($courseid, $pseudonymousid, $apitoken);
     $result = local_srl_advisor_relay_backend_call('banner', '/api/v1/action-items', 'GET', null, $jwt);
     if (!$result['ok']) {
         return;
     }
     $items = $result['data']['items'] ?? [];
-    $has_summative = false;
+    $hassummative = false;
     foreach ($items as $item) {
         if (isset($item['type']) && $item['type'] === 'summative_survey') {
-            $has_summative = true;
+            $hassummative = true;
             break;
         }
     }
-    if (!$has_summative) {
+    if (!$hassummative) {
         return;
     }
 
     // Portal launch URL — same as nav-badge; backend's /launch routes the
     // student into the consent/dashboard flow which surfaces the survey card.
-    $portal_url = (new moodle_url('/local/srl_advisor/launch.php', ['courseid' => $courseid]))->out(false);
+    $portalurl = (new moodle_url('/local/srl_advisor/launch.php', ['courseid' => $courseid]))->out(false);
     $heading = get_string('summative_banner_heading', 'local_srl_advisor');
     $cta     = get_string('summative_banner_cta', 'local_srl_advisor');
     $link    = get_string('summative_banner_link', 'local_srl_advisor');
@@ -664,6 +695,6 @@ function local_srl_advisor_render_before_footer() {
         'heading'    => $heading,
         'cta'        => $cta,
         'link_label' => $link,
-        'portal_url' => $portal_url,
+        'portal_url' => $portalurl,
     ]);
 }

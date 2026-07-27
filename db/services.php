@@ -1,4 +1,19 @@
 <?php
+// This file is part of Moodle - https://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
+
 /**
  * Web service declarations for the SRL Advisor local plugin (DEC-017).
  *
@@ -21,7 +36,9 @@ $functions = [
     'local_srl_advisor_get_enrolled_hashed_users' => [
         'classname'     => 'local_srl_advisor\\external\\enrolled_users',
         'methodname'    => 'get_enrolled_hashed_users',
-        'description'   => 'Returns enrolled active students in a course as {pseudo_id, moodle_user_id} pairs. pseudo_id is sha256(user_id . site_identifier) — the same scheme used by the launch flow. Used by SRL Advisor consent-gated data sync.',
+        'description'   => 'Returns enrolled active students in a course as {pseudo_id, moodle_user_id} pairs. ' .
+            'pseudo_id is sha256(user_id . site_identifier) — same scheme as the launch flow. ' .
+            'Used by SRL Advisor consent-gated data sync.',
         'type'          => 'read',
         'capabilities'  => 'moodle/course:viewparticipants',
         'ajax'          => false,
@@ -32,7 +49,7 @@ $functions = [
     'local_srl_advisor_get_pending_check_in' => [
         'classname'     => 'local_srl_advisor\\external\\get_pending_check_in',
         'methodname'    => 'execute',
-        'description'   => 'Returns the pending unit check-in payload (or empty struct) for the current user, course and section. Used by the inline AMD module.',
+        'description'   => 'Returns the pending unit check-in payload (or empty struct) for the current user, course and section.',
         'type'          => 'read',
         'ajax'          => true,
         'loginrequired' => true,
@@ -40,7 +57,8 @@ $functions = [
     'local_srl_advisor_submit_check_in' => [
         'classname'     => 'local_srl_advisor\\external\\submit_check_in',
         'methodname'    => 'execute',
-        'description'   => 'Submits the inline check-in choice (strategy or no_strategy). Requires a client-generated Idempotency-Key to suppress duplicate POSTs on retry.',
+        'description'   => 'Submits the inline check-in choice (strategy or no_strategy). ' .
+            'Requires a client-generated Idempotency-Key to suppress duplicate POSTs on retry.',
         'type'          => 'write',
         'ajax'          => true,
         'loginrequired' => true,
@@ -48,7 +66,8 @@ $functions = [
     'local_srl_advisor_dismiss_check_in' => [
         'classname'     => 'local_srl_advisor\\external\\dismiss_check_in',
         'methodname'    => 'execute',
-        'description'   => 'Records an inline-panel dismissal. Does NOT complete the underlying task — the nav badge keeps surfacing it as pending work.',
+        'description'   => 'Records an inline-panel dismissal. Does NOT complete the underlying task; ' .
+            'the nav badge keeps surfacing it as pending work.',
         'type'          => 'write',
         'ajax'          => true,
         'loginrequired' => true,
