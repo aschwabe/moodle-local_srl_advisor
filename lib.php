@@ -217,22 +217,41 @@ function local_srl_advisor_relay_backend_call($category, $path, $method, $body, 
 
 
 /**
- * Calls the SRL Advisor action-items API and returns the pending count.
- * Returns 0 silently on any error so a slow or unreachable backend never
- * breaks Moodle navigation.
+ * Fetches the action-items API response for the current participant, memoized
+ * per-request per course. The badge (course nav), navbar-output, and footer
+ * banner paths all need this endpoint; without memoization each issued its own
+ * backend round-trip (3 HTTP calls per page render). Keyed by course id — user
+ * and site are fixed within a request, so the response is identical.
  *
- * Thin wrapper over `local_srl_advisor_relay_backend_call` (DEC-031 BLOCKER #3).
+ * @param int    $courseid         Moodle course id.
+ * @param string $pseudonymousid   sha256(user_id . site_identifier).
+ * @param string $apitoken         Plugin-configured signing token.
+ * @return array|null  Decoded response data (pending_count, items) or null on backend error.
+ */
+function local_srl_advisor_fetch_action_items($courseid, $pseudonymousid, $apitoken) {
+    static $memo = [];
+    if (array_key_exists($courseid, $memo)) {
+        return $memo[$courseid];
+    }
+    $jwt = local_srl_advisor_build_jwt($courseid, $pseudonymousid, $apitoken);
+    $result = local_srl_advisor_relay_backend_call('badge', '/api/v1/action-items', 'GET', null, $jwt);
+    $memo[$courseid] = $result['ok'] ? ($result['data'] ?? []) : null;
+    return $memo[$courseid];
+}
+
+/**
+ * Returns the pending action-item count for the current participant. Thin
+ * wrapper over the memoized fetch; returns 0 on any error so a slow or
+ * unreachable backend never breaks Moodle navigation (DEC-031 BLOCKER #3).
  *
- * @param string $backend_url   Unused — kept for backwards-compat with callers.
- * @param string $jwt           Signed JWT for Bearer authentication.
+ * @param int    $courseid         Moodle course id.
+ * @param string $pseudonymousid   sha256(user_id . site_identifier).
+ * @param string $apitoken         Plugin-configured signing token.
  * @return int  Number of pending action items (0 on error).
  */
-function local_srl_advisor_get_pending_count($backendurl, $jwt) {
-    $result = local_srl_advisor_relay_backend_call('badge', '/api/v1/action-items', 'GET', null, $jwt);
-    if (!$result['ok']) {
-        return 0;
-    }
-    return isset($result['data']['pending_count']) ? (int)$result['data']['pending_count'] : 0;
+function local_srl_advisor_get_pending_count($courseid, $pseudonymousid, $apitoken) {
+    $data = local_srl_advisor_fetch_action_items($courseid, $pseudonymousid, $apitoken);
+    return isset($data['pending_count']) ? (int)$data['pending_count'] : 0;
 }
 
 /**
@@ -292,9 +311,6 @@ function local_srl_advisor_student_has_consented($courseid, $pseudonymousid, $ap
 function local_srl_advisor_extend_navigation_course($navigation, $course, $context) {
     global $USER, $CFG;
 
-    // LAB-001 diagnostic — confirm hook fires at all on this page.
-    debugging("local_srl_advisor: extend_navigation_course ENTER courseid={$course->id} userid={$USER->id}", DEBUG_DEVELOPER);
-
     // Only show the link to enrolled students (not guests, admins viewing as themselves).
     if (!isloggedin() || isguestuser()) {
         debugging("local_srl_advisor: SKIP — not logged in or guest user", DEBUG_DEVELOPER);
@@ -328,15 +344,11 @@ function local_srl_advisor_extend_navigation_course($navigation, $course, $conte
         return;
     }
 
-    debugging("local_srl_advisor: PASS gates — calling action-items API (backend_url={$backendurl})", DEBUG_DEVELOPER);
-
     // Derive the pseudonymous user ID (matches what launch.php sends).
     $pseudonymousid = hash('sha256', $USER->id . $CFG->siteidentifier);
 
-    // Query the SRL Advisor API for pending action items.
-    $jwt           = local_srl_advisor_build_jwt($course->id, $pseudonymousid, $apitoken);
-    $pendingcount = local_srl_advisor_get_pending_count($backendurl, $jwt);
-    debugging("local_srl_advisor: pending_count={$pendingcount} — rendering nav node", DEBUG_DEVELOPER);
+    // Query the SRL Advisor API for pending action items (memoized per request).
+    $pendingcount = local_srl_advisor_get_pending_count($course->id, $pseudonymousid, $apitoken);
 
     // Build the nav label — append a Bootstrap pill badge when there are pending items.
     // Boost theme ships Bootstrap 4/5 utility classes; Moodle's nav renderer emits label HTML
@@ -427,8 +439,7 @@ function local_srl_advisor_render_navbar_output(\renderer_base $renderer): strin
         $pendingcount = $cached;
     } else {
         $pseudonymousid = hash('sha256', $USER->id . $CFG->siteidentifier);
-        $jwt = local_srl_advisor_build_jwt($courseid, $pseudonymousid, $apitoken);
-        $pendingcount = (int)local_srl_advisor_get_pending_count($backendurl, $jwt);
+        $pendingcount = (int)local_srl_advisor_get_pending_count($courseid, $pseudonymousid, $apitoken);
         $SESSION->{$cachekey} = $pendingcount;
         $SESSION->{$cacheatkey} = $now;
     }
@@ -664,12 +675,11 @@ function local_srl_advisor_render_before_footer() {
     // student sees the prompt regardless of where they land after finishing
     // the course. Single backend round-trip per render; no AMD/AJAX.
     // $pseudonymous_id computed once after the capability gate above.
-    $jwt = local_srl_advisor_build_jwt($courseid, $pseudonymousid, $apitoken);
-    $result = local_srl_advisor_relay_backend_call('banner', '/api/v1/action-items', 'GET', null, $jwt);
-    if (!$result['ok']) {
+    $data = local_srl_advisor_fetch_action_items($courseid, $pseudonymousid, $apitoken);
+    if ($data === null) {
         return;
     }
-    $items = $result['data']['items'] ?? [];
+    $items = $data['items'] ?? [];
     $hassummative = false;
     foreach ($items as $item) {
         if (isset($item['type']) && $item['type'] === 'summative_survey') {
