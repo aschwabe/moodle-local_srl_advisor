@@ -26,10 +26,28 @@
         aria_label             string
         idempotency_key        string  (UUID v4 generated client-side)
         placeholder_label      string  ("Pick one…" — localised)
+        other_label            string  (label for the free-text "Other" input)
+        other_placeholder      string  (placeholder for the free-text input)
         options                array of {kind, strategy_id, name, description, label}
 
-    NB: an @example block containing nested Mustache section tags would itself
-    be parsed and break Mustache_Parser. The example is intentionally omitted.
+    Example context (json):
+    {
+        "task_id": 12,
+        "is_pre": true,
+        "heading": "Before you start this section, what strategy will you use?",
+        "submit_label": "Save",
+        "dismiss_label": "Not now",
+        "portal_fallback_label": "Read more about learning strategies on SRL Advisor",
+        "portal_url": "https://srladvisor.example.com/launch",
+        "aria_label": "SRL Advisor check-in",
+        "idempotency_key": "3f2504e0-4f89-41d3-9a0c-0305e82c3301",
+        "placeholder_label": "Pick one…",
+        "other_label": "Tell us briefly which strategy you have in mind",
+        "other_placeholder": "In your own words (max 200 chars)…",
+        "options": [
+            {"kind": "strategy", "strategy_id": 3, "name": "Retrieval practice", "description": "Test yourself without notes", "label": "Retrieval practice"}
+        ]
+    }
 }}
 <aside class="srladvisor-check-in"
        role="region"

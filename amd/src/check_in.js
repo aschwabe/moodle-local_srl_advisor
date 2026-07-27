@@ -132,6 +132,13 @@ define([
         });
     }
 
+    /**
+     * Fetch the pending check-in task for a course section via AJAX.
+     *
+     * @param {Number} courseid  Moodle course id.
+     * @param {Number} sectionid Moodle course_sections.id (NOT sectionnum).
+     * @return {Promise<Object>} Resolves to the pending check-in payload.
+     */
     function fetchPending(courseid, sectionid) {
         return Ajax.call([{
             methodname: 'local_srl_advisor_get_pending_check_in',
@@ -139,6 +146,18 @@ define([
         }])[0];
     }
 
+    /**
+     * Submit a check-in response via AJAX.
+     *
+     * @param {Number} courseid       Moodle course id.
+     * @param {Number} taskid         Check-in task id.
+     * @param {Number} strategyid     Selected strategy id (0 when none/other).
+     * @param {Boolean} nostrategy    True when the student picked "no strategy".
+     * @param {String} otherText      Free-text strategy when "Other" was picked.
+     * @param {Number} responseTimeMs Milliseconds from render to submit.
+     * @param {String} idemKey        Idempotency key (UUID v4).
+     * @return {Promise<Object>} Resolves to the submit result payload.
+     */
     function submit(courseid, taskid, strategyid, nostrategy, otherText, responseTimeMs, idemKey) {
         return Ajax.call([{
             methodname: 'local_srl_advisor_submit_check_in',
@@ -154,6 +173,15 @@ define([
         }])[0];
     }
 
+    /**
+     * Dismiss a pending check-in task via AJAX.
+     *
+     * @param {Number} courseid Moodle course id.
+     * @param {Number} taskid   Check-in task id.
+     * @param {String} reason   Optional dismissal reason.
+     * @param {String} idemKey  Idempotency key (UUID v4).
+     * @return {Promise<Object>} Resolves to the dismiss result payload.
+     */
     function dismiss(courseid, taskid, reason, idemKey) {
         return Ajax.call([{
             methodname: 'local_srl_advisor_dismiss_check_in',
@@ -166,11 +194,22 @@ define([
         }])[0];
     }
 
+    /**
+     * Render the check-in Mustache panel into a mount point and wire handlers.
+     *
+     * @param {HTMLElement} mount  Mount-point element to render into.
+     * @param {Object} task        Pending check-in task payload from the backend.
+     * @param {Object} strings     Localised string map from loadStrings().
+     * @param {Number} courseid    Moodle course id.
+     * @param {String} portalUrl   Fallback portal launch URL.
+     * @return {Promise} Resolves once the panel is rendered and handlers wired.
+     */
     function renderPanel(mount, task, strings, courseid, portalUrl) {
         const heading = task.is_pre ? strings.question_pre : strings.question_post;
         // Server-side already shuffled; ensure each option carries the kind flag the
         // template branches on. strategy_id=0 + kind=no_strategy triggers the no-strat
         // branch; strategy_id>0 triggers the strategy branch.
+        /* eslint-disable camelcase */
         const ctx = {
             task_id: task.task_id,
             is_pre: task.is_pre,
@@ -186,12 +225,22 @@ define([
             other_placeholder: strings.other_placeholder,
             options: task.options
         };
+        /* eslint-enable camelcase */
         return Templates.render('local_srl_advisor/check_in_panel', ctx).then(function(html) {
             mount.innerHTML = html;
             wireHandlers(mount, task, strings, courseid);
         });
     }
 
+    /**
+     * Wire submit/dismiss/selection handlers on a rendered check-in panel.
+     *
+     * @param {HTMLElement} mount  Mount-point element containing the panel.
+     * @param {Object} task        Pending check-in task payload from the backend.
+     * @param {Object} strings     Localised string map from loadStrings().
+     * @param {Number} courseid    Moodle course id.
+     * @return {void}
+     */
     function wireHandlers(mount, task, strings, courseid) {
         const $panel = $(mount).find('.srladvisor-check-in');
         const $form = $panel.find('[data-srladvisor-form]');
@@ -204,6 +253,11 @@ define([
         const $status = $panel.find('[data-srladvisor-status]');
         const renderedAt = Date.now();
 
+        /**
+         * Clear the status line text and reset its success/error classes.
+         *
+         * @return {void}
+         */
         function clearStatus() {
             $status.text('').removeClass('srladvisor-check-in__status--success srladvisor-check-in__status--error');
         }
@@ -212,6 +266,12 @@ define([
         // option. Description block mirrors the selected option's data-description.
         // DEC-048 follow-up: when 'Other' selected, reveal text input + require
         // non-empty value to enable Save.
+        /**
+         * Mirror the selected option's description, toggle the "Other" text
+         * input, and enable/disable the submit button accordingly.
+         *
+         * @return {void}
+         */
         function syncSelection() {
             const $opt = $select.find('option:selected');
             const value = $select.val();

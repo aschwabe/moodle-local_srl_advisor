@@ -35,16 +35,16 @@
  * matches the PyJWT-backed verifier on the backend (DEC-039).
  *
  * @param int      $courseid        Moodle course ID.
- * @param string   $pseudonymous_id SHA-256 hash of user ID + site identifier.
- * @param string   $api_token       Org API token used as the HMAC signing secret.
- * @param int      $ttl_seconds     Token validity window in seconds. Defaults
+ * @param string   $pseudonymousid  SHA-256 hash of user ID + site identifier.
+ * @param string   $apitoken        Org API token used as the HMAC signing secret.
+ * @param int      $ttlseconds      Token validity window in seconds. Defaults
  *                                  to 30 (DEC-031 short-TTL for AJAX relays).
  *                                  launch.php overrides to 300 to cover the
  *                                  student's redirect to the backend.
- * @param int|null $section_id      Optional Moodle section ID — surfaced as
+ * @param int|null $sectionid       Optional Moodle section ID — surfaced as
  *                                  the `section_id` claim for micro-survey
  *                                  routing in the launch flow.
- * @param string|null $section_label Optional human-readable Moodle section name
+ * @param string|null $sectionlabel Optional human-readable Moodle section name
  *                                  (`course_sections.name` or "Topic N" fallback)
  *                                  — surfaced as the `section_label` claim so the
  *                                  backend can stamp portal task labels with the
@@ -102,7 +102,7 @@ function local_srl_advisor_build_jwt(
  * @param array|null $body    JSON-encoded on POST; ignored on GET.
  * @param string $jwt         Signed Bearer token.
  * @param int    $timeout     Seconds. Default 3 — never block Moodle nav longer than that.
- * @param array  $extra_headers Optional extra HTTP headers (e.g. Idempotency-Key).
+ * @param array  $extraheaders Optional extra HTTP headers (e.g. Idempotency-Key).
  *                              Each entry is the full header line, e.g. 'Idempotency-Key: <uuid>'.
  * @return array {
  *   bool ok,
@@ -269,8 +269,8 @@ function local_srl_advisor_get_pending_count($courseid, $pseudonymousid, $apitok
  * defense-in-depth second layer; this gate stops transmission at the source.
  *
  * @param int    $courseid         Moodle course id (for the JWT audience).
- * @param string $pseudonymous_id  sha256(user_id . site_identifier).
- * @param string $api_token        Plugin-configured signing token.
+ * @param string $pseudonymousid   sha256(user_id . site_identifier).
+ * @param string $apitoken         Plugin-configured signing token.
  * @return bool  True iff the student has an active consent record.
  */
 function local_srl_advisor_student_has_consented($courseid, $pseudonymousid, $apitoken) {

@@ -35,6 +35,8 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+namespace local_srl_advisor;
+
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
@@ -46,9 +48,10 @@ require_once($CFG->dirroot . '/local/srl_advisor/lib.php');
  * @package    local_srl_advisor
  * @copyright  2026 Andrew Schwabe
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @coversNothing
  */
-class check_in_inline_smoke_test extends advanced_testcase {
-    public function test_relay_helper_refuses_non_api_v1_path() {
+final class check_in_inline_smoke_test extends \advanced_testcase {
+    public function test_relay_helper_refuses_non_api_v1_path(): void {
         $this->resetAfterTest();
         $result = local_srl_advisor_relay_backend_call(
             'inline_get',
@@ -62,7 +65,7 @@ class check_in_inline_smoke_test extends advanced_testcase {
         $this->assertSame('transport', $result['error_kind']);
     }
 
-    public function test_relay_helper_reports_transport_when_backend_url_empty() {
+    public function test_relay_helper_reports_transport_when_backend_url_empty(): void {
         $this->resetAfterTest();
         // Ensure the plugin is unconfigured for this test.
         set_config('backend_url', '', 'local_srl_advisor');
@@ -79,7 +82,7 @@ class check_in_inline_smoke_test extends advanced_testcase {
         $this->assertSame('transport', $result['error_kind']);
     }
 
-    public function test_jwt_uses_30_second_ttl() {
+    public function test_jwt_uses_30_second_ttl(): void {
         $this->resetAfterTest();
         $jwt = local_srl_advisor_build_jwt(42, 'pseudo', 'secret');
         $parts = explode('.', $jwt);
@@ -94,7 +97,7 @@ class check_in_inline_smoke_test extends advanced_testcase {
         $this->assertNull($payload['section_id']);
     }
 
-    public function test_jwt_launch_override_uses_300_second_ttl_and_section_id() {
+    public function test_jwt_launch_override_uses_300_second_ttl_and_section_id(): void {
         // DEC-043: launch.php delegates to local_srl_advisor_build_jwt with
         // ttl=300 + non-null section_id. Same canonical mint, different
         // claim values. Locks the launch-flow override against drift.
@@ -108,7 +111,7 @@ class check_in_inline_smoke_test extends advanced_testcase {
         $this->assertSame(7, $payload['section_id']);
     }
 
-    public function test_jwt_emits_urlsafe_base64_segments() {
+    public function test_jwt_emits_urlsafe_base64_segments(): void {
         // DEC-043 / DEC-039: every segment must be RFC 7515 URL-safe base64
         // (no '+', '/', or '=' padding). Backend PyJWT decoder is tolerant of
         // standard base64 but standardising both ends closes the cross-impl
@@ -135,10 +138,10 @@ class check_in_inline_smoke_test extends advanced_testcase {
         return $decoded;
     }
 
-    public function test_get_pending_check_in_requires_login() {
+    public function test_get_pending_check_in_requires_login(): void {
         $this->resetAfterTest();
         // No session — Moodle's external_api login-required wrapper should throw.
-        $this->expectException(require_login_exception::class);
+        $this->expectException(\require_login_exception::class);
         \local_srl_advisor\external\get_pending_check_in::execute(1, 1);
     }
 
@@ -148,10 +151,10 @@ class check_in_inline_smoke_test extends advanced_testcase {
      * be granted to a NON-enrolled user (researcher/auditor) without enrolling
      * them — the use case that drove the capability off the DEC-047/049 deferral.
      */
-    public function test_participate_capability_gate() {
+    public function test_participate_capability_gate(): void {
         $this->resetAfterTest();
         $course  = $this->getDataGenerator()->create_course();
-        $context = context_course::instance($course->id);
+        $context = \context_course::instance($course->id);
 
         // Enrolled student gets the cap via the student archetype.
         $student = $this->getDataGenerator()->create_user();

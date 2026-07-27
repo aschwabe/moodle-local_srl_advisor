@@ -61,6 +61,9 @@ class enrolled_users extends external_api {
      *
      * Pulls only u.id from get_enrolled_users() — no names, emails, or other
      * profile fields are read, so the call cannot accidentally leak PII.
+     *
+     * @param int $courseid Moodle course id to enumerate enrolled users for.
+     * @return array List of ['pseudo_id' => string, 'moodle_user_id' => int].
      */
     public static function get_enrolled_hashed_users(int $courseid): array {
         global $CFG;

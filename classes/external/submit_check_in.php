@@ -175,6 +175,9 @@ class submit_check_in extends external_api {
     /**
      * Map relay-helper error_kind + http_code to a stable short string the AMD
      * module can branch on without parsing free-form server detail text.
+     *
+     * @param array $result Relay-helper result array (error_kind, http_code, ...).
+     * @return string Stable short error code for the AMD module.
      */
     private static function map_error(array $result): string {
         $kind = $result['error_kind'] ?? 'unknown';
