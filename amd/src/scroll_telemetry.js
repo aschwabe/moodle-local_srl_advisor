@@ -18,9 +18,8 @@
  *   session_id continuation. Out of scope for this MVP.
  */
 define([
-    'core/ajax',
-    'core/notification'
-], function(Ajax, Notification) {
+    'core/ajax'
+], function(Ajax) {
 
     'use strict';
 
@@ -139,8 +138,8 @@ define([
                         methodname: 'local_srl_advisor_record_behavior_events',
                         args: {courseid: courseid, events: JSON.stringify(batch)}
                     }])[0].fail(function(err) {
-                        if (window.console && console.warn) {
-                            console.warn('local_srl_advisor[scroll]: flush failed (' + reason + ')', err);
+                        if (window.console && window.console.warn) {
+                            window.console.warn('local_srl_advisor[scroll]: flush failed (' + reason + ')', err);
                         }
                     });
                 };
@@ -246,8 +245,8 @@ define([
                 flush('init');
                 return flushTimer;
             } catch (e) {
-                if (window.console && console.warn) {
-                    console.warn('local_srl_advisor[scroll]: init failed', e);
+                if (window.console && window.console.warn) {
+                    window.console.warn('local_srl_advisor[scroll]: init failed', e);
                 }
                 return null;
             }

@@ -18,9 +18,8 @@
  * Batched flush every 5s, same pattern as scroll_telemetry.
  */
 define([
-    'core/ajax',
-    'core/notification'
-], function(Ajax, Notification) {
+    'core/ajax'
+], function(Ajax) {
 
     'use strict';
 
@@ -145,8 +144,8 @@ define([
                         methodname: 'local_srl_advisor_record_behavior_events',
                         args: {courseid: courseid, events: JSON.stringify(batch)}
                     }])[0].fail(function(err) {
-                        if (window.console && console.warn) {
-                            console.warn('local_srl_advisor[clipboard]: flush failed (' + reason + ')', err);
+                        if (window.console && window.console.warn) {
+                            window.console.warn('local_srl_advisor[clipboard]: flush failed (' + reason + ')', err);
                         }
                     });
                 };
@@ -205,8 +204,8 @@ define([
 
                 return flushTimer;
             } catch (e) {
-                if (window.console && console.warn) {
-                    console.warn('local_srl_advisor[clipboard]: init failed', e);
+                if (window.console && window.console.warn) {
+                    window.console.warn('local_srl_advisor[clipboard]: init failed', e);
                 }
                 return null;
             }

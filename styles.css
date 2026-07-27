@@ -117,10 +117,10 @@
 
 .srladvisor-navbar__link {
     position: relative;
-    display: inline-flex !important;
+    display: inline-flex !important; /* stylelint-disable-line declaration-no-important */
     align-items: center;
-    padding: 0.25rem 0.5rem !important;
-    line-height: 1 !important;
+    padding: 0.25rem 0.5rem !important; /* stylelint-disable-line declaration-no-important */
+    line-height: 1 !important; /* stylelint-disable-line declaration-no-important */
     color: inherit;
 }
 

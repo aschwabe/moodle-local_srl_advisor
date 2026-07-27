@@ -413,14 +413,14 @@ define([
                     return renderPanel(mount, payload, strings, courseid, portalUrl);
                 }).fail(function(err) {
                     // Silent failure on bootstrap — log only at DEBUG_DEVELOPER
-                    // equivalent (console.warn).
-                    if (window.console && console.warn) {
-                        console.warn('local_srl_advisor[inline_get]: bootstrap failed', err);
+                    // equivalent (window.console.warn).
+                    if (window.console && window.console.warn) {
+                        window.console.warn('local_srl_advisor[inline_get]: bootstrap failed', err);
                     }
                 });
             } catch (e) {
-                if (window.console && console.warn) {
-                    console.warn('local_srl_advisor[inline_get]: init exception', e);
+                if (window.console && window.console.warn) {
+                    window.console.warn('local_srl_advisor[inline_get]: init exception', e);
                 }
             }
         }

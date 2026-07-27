@@ -133,8 +133,8 @@ define([
                         methodname: 'local_srl_advisor_record_behavior_events',
                         args: {courseid: courseid, events: JSON.stringify(batch)}
                     }])[0].fail(function(err) {
-                        if (window.console && console.warn) {
-                            console.warn('local_srl_advisor[video]: flush failed (' + reason + ')', err);
+                        if (window.console && window.console.warn) {
+                            window.console.warn('local_srl_advisor[video]: flush failed (' + reason + ')', err);
                         }
                     });
                 };
@@ -264,7 +264,9 @@ define([
                             window.onYouTubeIframeAPIReady = start;
                         }
                     }).catch(function(e) {
-                        if (window.console && console.warn) { console.warn('local_srl_advisor[video]: YT load failed', e); }
+                        if (window.console && window.console.warn) {
+                            window.console.warn('local_srl_advisor[video]: YT load failed', e);
+                        }
                     });
                 }
 
@@ -311,7 +313,9 @@ define([
                             });
                         });
                     }).catch(function(e) {
-                        if (window.console && console.warn) { console.warn('local_srl_advisor[video]: Vimeo load failed', e); }
+                        if (window.console && window.console.warn) {
+                            window.console.warn('local_srl_advisor[video]: Vimeo load failed', e);
+                        }
                     });
                 }
 
@@ -333,8 +337,8 @@ define([
                         try {
                             tenantOrigin = new URL(iframe.src).origin;
                         } catch (e) {
-                            if (window.console && console.warn) {
-                                console.warn('local_srl_advisor[video]: Panopto iframe src unparseable', e);
+                            if (window.console && window.console.warn) {
+                                window.console.warn('local_srl_advisor[video]: Panopto iframe src unparseable', e);
                             }
                             return;
                         }
@@ -344,8 +348,8 @@ define([
                         }
                         tenantsLoaded[tenantOrigin].then(function() {
                             if (!window.EmbedApi) {
-                                if (window.console && console.warn) {
-                                    console.warn('local_srl_advisor[video]: Panopto EmbedApi not on window after load');
+                                if (window.console && window.console.warn) {
+                                    window.console.warn('local_srl_advisor[video]: Panopto EmbedApi not on window after load');
                                 }
                                 return;
                             }
@@ -409,8 +413,8 @@ define([
                                 }
                             });
                         }).catch(function(e) {
-                            if (window.console && console.warn) {
-                                console.warn('local_srl_advisor[video]: Panopto EmbedApi load failed', e);
+                            if (window.console && window.console.warn) {
+                                window.console.warn('local_srl_advisor[video]: Panopto EmbedApi load failed', e);
                             }
                         });
                     });
@@ -427,8 +431,8 @@ define([
                 });
                 return window.setInterval(function() { flush('interval'); }, FLUSH_INTERVAL_MS);
             } catch (e) {
-                if (window.console && console.warn) {
-                    console.warn('local_srl_advisor[video]: init failed', e);
+                if (window.console && window.console.warn) {
+                    window.console.warn('local_srl_advisor[video]: init failed', e);
                 }
                 return null;
             }
