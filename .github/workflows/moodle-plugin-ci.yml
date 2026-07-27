@@ -1,0 +1,119 @@
+name: Moodle Plugin CI
+
+# Mirrors the Moodle plugins directory / Marketplace automated prechecker
+# (phplint, phpcs moodle standard, phpdoc, validate, savepoints, mustache,
+# grunt, phpunit, behat) across the declared support range 4.5 (405) -> 5.2
+# (502), on both PostgreSQL and MariaDB, per the Marketplace requirement to
+# test on multiple DB engines. See docs/howto/moodle_marketplace_submission.md.
+
+on:
+  push:
+    branches: ['*']
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: 'postgres'
+          POSTGRES_HOST_AUTH_METHOD: 'trust'
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready" --health-interval=10s
+          --health-timeout=5s --health-retries=3
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MYSQL_USER: 'root'
+          MYSQL_ALLOW_EMPTY_PASSWORD: "true"
+          MYSQL_CHARACTER_SET_SERVER: "utf8mb4"
+          MYSQL_COLLATION_SERVER: "utf8mb4_unicode_ci"
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s --health-timeout=5s --health-retries=3
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # 4.5 LTS (branch 405): PHP 8.1-8.3
+          - {moodle-branch: 'MOODLE_405_STABLE', php: '8.1', database: 'pgsql'}
+          - {moodle-branch: 'MOODLE_405_STABLE', php: '8.3', database: 'mariadb'}
+          # 5.0 (branch 500): PHP 8.2-8.4
+          - {moodle-branch: 'MOODLE_500_STABLE', php: '8.2', database: 'pgsql'}
+          # 5.1 (branch 501): PHP 8.2-8.4
+          - {moodle-branch: 'MOODLE_501_STABLE', php: '8.3', database: 'mariadb'}
+          # 5.2 (branch 502): PHP 8.3-8.4
+          - {moodle-branch: 'MOODLE_502_STABLE', php: '8.3', database: 'pgsql'}
+          - {moodle-branch: 'MOODLE_502_STABLE', php: '8.4', database: 'mariadb'}
+
+    steps:
+      - name: Check out plugin
+        uses: actions/checkout@v4
+        with:
+          path: plugin
+
+      - name: Set up PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mbstring, pgsql, mysqli, gd, zip, soap, intl
+          ini-values: max_input_vars=5000
+          coverage: none
+
+      - name: Initialise moodle-plugin-ci
+        run: |
+          composer create-project -n --no-dev --prefer-dist moodlehq/moodle-plugin-ci ci ^4
+          echo $(cd ci/bin; pwd) >> $GITHUB_PATH
+          echo $(cd ci/vendor/bin; pwd) >> $GITHUB_PATH
+          sudo locale-gen en_AU.UTF-8
+          echo "NVM_DIR=$HOME/.nvm" >> $GITHUB_ENV
+
+      - name: Install Moodle + plugin
+        run: moodle-plugin-ci install --plugin ./plugin --db-host=127.0.0.1
+        env:
+          DB: ${{ matrix.database }}
+          MOODLE_BRANCH: ${{ matrix.moodle-branch }}
+
+      - name: PHP Lint
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci phplint
+
+      - name: Moodle Code Checker (phpcs, 0 warnings)
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci phpcs --max-warnings 0
+
+      - name: Validate
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci validate
+
+      - name: Check upgrade savepoints
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci savepoints
+
+      - name: Mustache Lint
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci mustache
+
+      - name: Grunt
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci grunt
+
+      - name: PHPDoc
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci phpdoc
+
+      - name: PHPUnit
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci phpunit --fail-on-warning
+
+      - name: Behat
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci behat --profile chrome
