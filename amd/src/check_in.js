@@ -39,8 +39,10 @@ define([
         if (window.crypto && window.crypto.getRandomValues) {
             const bytes = new Uint8Array(16);
             window.crypto.getRandomValues(bytes);
+            /* eslint-disable no-bitwise */
             bytes[6] = (bytes[6] & 0x0f) | 0x40;
             bytes[8] = (bytes[8] & 0x3f) | 0x80;
+            /* eslint-enable no-bitwise */
             const hex = [];
             for (let i = 0; i < bytes.length; i++) {
                 hex.push((bytes[i] < 16 ? '0' : '') + bytes[i].toString(16));
@@ -54,12 +56,21 @@ define([
             );
         }
         return 'xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            /* eslint-disable no-bitwise */
             const r = Math.random() * 16 | 0;
             const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            /* eslint-enable no-bitwise */
             return v.toString(16);
         });
     }
 
+    /**
+     * Ensure a mount-point element exists for the given phase, creating and
+     * inserting it into the DOM if absent.
+     *
+     * @param {string} phase - 'pre' or 'post'; controls insertion position.
+     * @return {HTMLElement} The mount-point element.
+     */
     function ensureMount(phase) {
         const mountId = MOUNT_ID_PREFIX + phase;
         let mount = document.getElementById(mountId);
@@ -82,6 +93,11 @@ define([
         return mount;
     }
 
+    /**
+     * Load all localised strings required by the check-in panel via core/str.
+     *
+     * @return {Promise<Object>} Resolves to a keyed string map for template rendering.
+     */
     function loadStrings() {
         return Str.get_strings([
             {key: 'inline_question_pre', component: 'local_srl_advisor'},
@@ -97,6 +113,7 @@ define([
             {key: 'inline_other_placeholder', component: 'local_srl_advisor'},
             {key: 'inline_other_required', component: 'local_srl_advisor'}
         ]).then(function(s) {
+            /* eslint-disable camelcase */
             return {
                 question_pre: s[0],
                 question_post: s[1],
@@ -111,6 +128,7 @@ define([
                 other_placeholder: s[10],
                 other_required: s[11]
             };
+            /* eslint-enable camelcase */
         });
     }
 

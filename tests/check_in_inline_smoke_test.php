@@ -57,6 +57,7 @@ class check_in_inline_smoke_test extends advanced_testcase {
             null,
             'dummy.jwt'
         );
+        $this->assertDebuggingCalled();
         $this->assertFalse($result['ok']);
         $this->assertSame('transport', $result['error_kind']);
     }
@@ -73,6 +74,7 @@ class check_in_inline_smoke_test extends advanced_testcase {
             null,
             'dummy.jwt'
         );
+        $this->assertDebuggingCalled();
         $this->assertFalse($result['ok']);
         $this->assertSame('transport', $result['error_kind']);
     }
