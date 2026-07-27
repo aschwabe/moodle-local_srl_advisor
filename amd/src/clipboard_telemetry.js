@@ -27,12 +27,20 @@ define([
     const FLUSH_INTERVAL_MS = 5000;
     const COPY_THROTTLE_MS = 500;
 
+    /**
+     * RFC 4122 v4 UUID using the browser crypto API where available; falls
+     * back to Math.random for environments that don't ship crypto.getRandomValues.
+     *
+     * @return {string} A UUID v4 string.
+     */
     function uuidv4() {
         if (window.crypto && window.crypto.getRandomValues) {
             const bytes = new Uint8Array(16);
             window.crypto.getRandomValues(bytes);
+            /* eslint-disable no-bitwise */
             bytes[6] = (bytes[6] & 0x0f) | 0x40;
             bytes[8] = (bytes[8] & 0x3f) | 0x80;
+            /* eslint-enable no-bitwise */
             const hex = [];
             for (let i = 0; i < bytes.length; i++) {
                 hex.push((bytes[i] < 16 ? '0' : '') + bytes[i].toString(16));
@@ -46,12 +54,20 @@ define([
             );
         }
         return 'xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            /* eslint-disable no-bitwise */
             const r = Math.random() * 16 | 0;
             const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            /* eslint-enable no-bitwise */
             return v.toString(16);
         });
     }
 
+    /**
+     * Calculate the current scroll depth as a percentage of the total
+     * scrollable page height.
+     *
+     * @return {number} Scroll depth percentage (0–100, integer).
+     */
     function scrollDepthPct() {
         const doc = document.documentElement;
         const body = document.body;
@@ -67,6 +83,11 @@ define([
         return Math.max(0, Math.min(100, Math.round((scrolled / total) * 100)));
     }
 
+    /**
+     * Return the current time as an ISO 8601 string.
+     *
+     * @return {string} Current timestamp in ISO 8601 format.
+     */
     function nowIso() {
         return new Date().toISOString();
     }
@@ -74,6 +95,8 @@ define([
     /**
      * Read selection length without retaining the selected text.
      * Falls back to 0 when selection API is unavailable.
+     *
+     * @return {number} Length of the current text selection in characters.
      */
     function selectionLength() {
         try {
@@ -107,6 +130,12 @@ define([
                 let lastCopyMs = 0;
                 let flushTimer = null;
 
+                /**
+                 * Flush all pending clipboard events to the backend relay.
+                 *
+                 * @param {string} reason  Label for debug logging (e.g. 'interval', 'pagehide').
+                 * @return {void}
+                 */
                 const flush = function(reason) {
                     if (pending.length === 0) {
                         return;
@@ -122,6 +151,12 @@ define([
                     });
                 };
 
+                /**
+                 * Handle a document copy event, throttling burst copies and
+                 * enqueuing a clipboard.copied event in the pending batch.
+                 *
+                 * @return {void}
+                 */
                 const onCopy = function() {
                     const now = Date.now();
                     if (now - lastCopyMs < COPY_THROTTLE_MS) {

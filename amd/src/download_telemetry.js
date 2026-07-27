@@ -29,12 +29,20 @@ define([
     const FLUSH_INTERVAL_MS = 5000;
     const FILE_TYPE_MAX_LEN = 8;
 
+    /**
+     * RFC 4122 v4 UUID using the browser crypto API where available; falls
+     * back to Math.random for environments that don't ship crypto.getRandomValues.
+     *
+     * @return {string} A UUID v4 string.
+     */
     function uuidv4() {
         if (window.crypto && window.crypto.getRandomValues) {
             const bytes = new Uint8Array(16);
             window.crypto.getRandomValues(bytes);
+            /* eslint-disable no-bitwise */
             bytes[6] = (bytes[6] & 0x0f) | 0x40;
             bytes[8] = (bytes[8] & 0x3f) | 0x80;
+            /* eslint-enable no-bitwise */
             const hex = [];
             for (let i = 0; i < bytes.length; i++) {
                 hex.push((bytes[i] < 16 ? '0' : '') + bytes[i].toString(16));
@@ -48,12 +56,20 @@ define([
             );
         }
         return 'xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            /* eslint-disable no-bitwise */
             const r = Math.random() * 16 | 0;
             const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            /* eslint-enable no-bitwise */
             return v.toString(16);
         });
     }
 
+    /**
+     * Calculate the current scroll depth as a percentage of the total
+     * scrollable page height.
+     *
+     * @return {number} Scroll depth percentage (0–100, integer).
+     */
     function scrollDepthPct() {
         const doc = document.documentElement;
         const body = document.body;
@@ -69,6 +85,11 @@ define([
         return Math.max(0, Math.min(100, Math.round((scrolled / total) * 100)));
     }
 
+    /**
+     * Return the current time as an ISO 8601 string.
+     *
+     * @return {string} Current timestamp in ISO 8601 format.
+     */
     function nowIso() {
         return new Date().toISOString();
     }
@@ -84,6 +105,9 @@ define([
      * here, which is misleading for analysts who'd interpret it as the file
      * type. Return the sentinel 'resource' instead — joins against
      * `mdl_files` server-side recover the real extension when needed.
+     *
+     * @param {string} href  The anchor href to extract the file type from.
+     * @return {string} Lowercased alphanumeric extension token, or 'other'/'resource'.
      */
     function fileTypeFromHref(href) {
         if (!href || typeof href !== 'string') {
@@ -119,6 +143,9 @@ define([
      *   - anchor has [download] attribute  → explicit HTML5 download anchor
      *   - href contains '/mod/resource/view.php' → mod-resource activity link
      *     (Moodle redirects this to the actual file)
+     *
+     * @param {HTMLElement} anchor  The anchor element to test.
+     * @return {boolean} True when the anchor is a tracked download target.
      */
     function isDownloadAnchor(anchor) {
         if (!anchor || anchor.tagName !== 'A') {
@@ -153,6 +180,12 @@ define([
                 const pending = [];
                 let flushTimer = null;
 
+                /**
+                 * Flush all pending download events to the backend relay.
+                 *
+                 * @param {string} reason  Label for debug logging (e.g. 'click', 'pagehide').
+                 * @return {void}
+                 */
                 const flush = function(reason) {
                     if (pending.length === 0) {
                         return;
@@ -168,6 +201,14 @@ define([
                     });
                 };
 
+                /**
+                 * Handle a document click event, walking up the DOM to find the
+                 * nearest anchor and enqueuing a download.clicked event when it
+                 * matches a tracked download pattern.
+                 *
+                 * @param {MouseEvent} ev  The click event.
+                 * @return {void}
+                 */
                 const onClick = function(ev) {
                     let target = ev.target;
                     // Walk up to find the nearest anchor (handles clicks on child <span>, <i>, etc.).

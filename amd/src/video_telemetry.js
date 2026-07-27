@@ -30,12 +30,20 @@ define([
     const YT_API_SRC = 'https://www.youtube.com/iframe_api';
     const VIMEO_API_SRC = 'https://player.vimeo.com/api/player.js';
 
+    /**
+     * RFC 4122 v4 UUID using the browser crypto API where available; falls
+     * back to Math.random for environments that don't ship crypto.getRandomValues.
+     *
+     * @return {string} A UUID v4 string.
+     */
     function uuidv4() {
         if (window.crypto && window.crypto.getRandomValues) {
             const bytes = new Uint8Array(16);
             window.crypto.getRandomValues(bytes);
+            /* eslint-disable no-bitwise */
             bytes[6] = (bytes[6] & 0x0f) | 0x40;
             bytes[8] = (bytes[8] & 0x3f) | 0x80;
+            /* eslint-enable no-bitwise */
             const hex = [];
             for (let i = 0; i < bytes.length; i++) {
                 hex.push((bytes[i] < 16 ? '0' : '') + bytes[i].toString(16));
@@ -49,16 +57,31 @@ define([
             );
         }
         return 'xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            /* eslint-disable no-bitwise */
             const r = Math.random() * 16 | 0;
             const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            /* eslint-enable no-bitwise */
             return v.toString(16);
         });
     }
 
+    /**
+     * Return the current time as an ISO 8601 string.
+     *
+     * @return {string} Current timestamp in ISO 8601 format.
+     */
     function nowIso() {
         return new Date().toISOString();
     }
 
+    /**
+     * Dynamically load a script by URL, resolving when loaded and rejecting
+     * on error. Safe to call multiple times for the same URL — subsequent
+     * calls resolve immediately if the script is already loaded.
+     *
+     * @param {string} src  Absolute URL of the script to load.
+     * @return {Promise<void>} Resolves when the script is ready.
+     */
     function loadScriptOnce(src) {
         return new Promise(function(resolve, reject) {
             const existing = document.querySelector('script[src="' + src + '"]');
@@ -95,6 +118,12 @@ define([
                 const pending = [];
                 let videoIndex = 0;
 
+                /**
+                 * Flush all pending video events to the backend relay.
+                 *
+                 * @param {string} reason  Label for debug logging (e.g. 'interval', 'pagehide').
+                 * @return {void}
+                 */
                 const flush = function(reason) {
                     if (pending.length === 0) {
                         return;
@@ -110,6 +139,15 @@ define([
                     });
                 };
 
+                /**
+                 * Enqueue a video behavior event into the pending batch.
+                 *
+                 * @param {string} verb      Event verb (e.g. 'video.played', 'video.paused').
+                 * @param {number} idx       Zero-based index of the video element on the page.
+                 * @param {Object} payload   Additional event-specific payload fields.
+                 * @param {string} idemKey   Optional idempotency key for dedup (e.g. session:end events).
+                 * @return {void}
+                 */
                 const emit = function(verb, idx, payload, idemKey) {
                     pending.push({
                         verb: verb,
